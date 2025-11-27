@@ -21,6 +21,7 @@ const SettingsPanel: React.FC = () => {
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
   // Local state for the model dropdown list
+  // initialized with empty array, populated via useEffect or handler
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
 
   // 1. INITIALIZATION & SYNC
