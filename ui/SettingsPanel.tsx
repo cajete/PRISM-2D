@@ -28,22 +28,30 @@ const SettingsPanel: React.FC = () => {
     }
   }, [isSettingsOpen]);
 
-  // Derived state: Get models for the currently selected provider
+  // 1. Get models for the currently selected provider
   const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
   const availableModels: AIModel[] = currentProvider?.models || [];
 
+  // 2. Derive effective model ID
+  // This safeguards the UI: If the store's selectedModel doesn't exist in the current provider's list 
+  // (which happens momentarily during switching), fall back to the first available model visually.
+  const effectiveSelectedModel = availableModels.find(m => m.id === aiSettings.selectedModel) 
+    ? aiSettings.selectedModel 
+    : availableModels[0]?.id || "";
+
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProviderName = e.target.value;
-    
-    // 1. Update Provider in Store
-    setAIProvider(newProviderName);
-    
-    // 2. Find the new provider's default model to prevent mismatch
     const newProvider = aiManager.getProviders().find(p => p.name === newProviderName);
-    const defaultModel = newProvider?.models[0];
     
-    if (defaultModel) {
-      setAIModel(defaultModel.id);
+    if (newProvider) {
+      // Update Provider
+      setAIProvider(newProviderName);
+      
+      // Automatically reset model to the first available one for this provider
+      // This ensures we never have a mismatch in state
+      if (newProvider.models.length > 0) {
+        setAIModel(newProvider.models[0].id);
+      }
     }
   };
 
@@ -105,7 +113,7 @@ const SettingsPanel: React.FC = () => {
                <label className="block text-[9px] text-slate-500 font-bold mb-1">MODEL ARCHITECTURE</label>
                <div className="relative">
                  <select 
-                    value={aiSettings.selectedModel}
+                    value={effectiveSelectedModel}
                     onChange={(e) => setAIModel(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium appearance-none"
                  >
