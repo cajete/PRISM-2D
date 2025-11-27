@@ -20,17 +20,17 @@ const SettingsPanel: React.FC = () => {
   // Local state for stats polling
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
-  // Local state for model list to ensure UI reactivity
+  // Local state for available models to ensure UI stability
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
 
-  // 1. Sync Logic: When panel opens or provider changes externally, update the list
+  // 1. SYNC EFFECT: Ensures local state matches Global Store on mount/update
   useEffect(() => {
     if (isSettingsOpen) {
       // Refresh Stats
       setAllStats(aiManager.getAllStats());
       const interval = setInterval(() => setAllStats(aiManager.getAllStats()), 2000);
 
-      // Refresh Model List based on current Store selection
+      // Sync Model List with currently selected provider in Store
       const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
       if (currentProvider) {
         setAvailableModels(currentProvider.models);
@@ -38,32 +38,36 @@ const SettingsPanel: React.FC = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isSettingsOpen, aiSettings.selectedProvider]);
+  }, [isSettingsOpen, aiSettings.selectedProvider]); // Dependency ensures sync if store changes externally
 
-  // 2. Robust Provider Change Handler
+  // 2. ROBUST CHANGE HANDLER
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProviderName = e.target.value;
     
-    // A. Find the new provider data
+    // A. Lookup new provider data
     const newProvider = aiManager.getProviders().find(p => p.name === newProviderName);
     
     if (newProvider) {
-      // B. Update Local State immediately (for UI responsiveness)
+      // CRITICAL: Update local state IMMEDIATELY so the dropdown re-renders with new options
       setAvailableModels(newProvider.models);
 
-      // C. Update Store: Provider
+      // B. Update Global Store Provider
       setAIProvider(newProviderName);
       
-      // D. Update Store: Model (Auto-select first available)
+      // C. Reset Model Selection (Default to first available model of new provider)
+      // We do this immediately to prevent the store from holding a model ID that doesn't exist on the new provider
       if (newProvider.models.length > 0) {
         setAIModel(newProvider.models[0].id);
+      } else {
+        setAIModel('');
       }
     }
   };
 
   const isVisible = ui.isSidebarOpen && isSettingsOpen;
 
-  // Safeguard: Ensure the dropdown value is valid. If the current store model isn't in the list, use the first one.
+  // Safeguard: Ensure the dropdown value matches a valid option in the list.
+  // If the store has a stale ID (from previous provider), fallback to first available model visually.
   const effectiveModelValue = availableModels.some(m => m.id === aiSettings.selectedModel)
     ? aiSettings.selectedModel
     : availableModels[0]?.id || "";
