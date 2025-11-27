@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { ResearchNode, OptimizedConnection, AppStatus, AIProviderStats, AISettings } from '../types/prism';
 import { INITIAL_NODES, INITIAL_LINKS } from '../data/mockData';
@@ -107,7 +106,17 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
     selectedModel: 'gemini-2.5-flash'
   },
   activeProvider: 'Gemini',
-  providerStats: { name: 'Gemini', activeModel: 'gemini-2.5-flash', remainingTokens: 150000, maxTokens: 150000, status: 'ACTIVE' },
+  providerStats: { 
+    name: 'Gemini', 
+    activeModel: 'gemini-2.5-flash', 
+    totalRemaining: 150000, 
+    totalMax: 150000, 
+    status: 'ACTIVE',
+    models: [
+      { id: 'gemini-2.0-flash-thinking-exp-1219', name: 'Flash Thinking (2.0)', type: 'heavy', remainingTokens: 50000, maxTokens: 50000 },
+      { id: 'gemini-2.5-flash', name: 'Flash 2.5', type: 'standard', remainingTokens: 150000, maxTokens: 150000 }
+    ]
+  },
 
   updateAIStatus: (name, stats) => set({ activeProvider: name, providerStats: stats }),
   setAIAutoMode: (enabled) => set(state => ({ aiSettings: { ...state.aiSettings, autoMode: enabled } })),

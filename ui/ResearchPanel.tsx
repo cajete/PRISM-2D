@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { usePrismStore } from '../store/prismStore';
 import { generateGraphFromTopic, findCorrelation } from '../services/aiService';
@@ -229,7 +228,7 @@ const ResearchPanel: React.FC = () => {
            <span>{activeProvider.toUpperCase()}</span>
            {providerStats && (
              <span className="opacity-70 border-l border-current pl-1.5 ml-0.5">
-               {Math.floor(providerStats.remainingTokens / 1000)}k TKN
+               {Math.floor(providerStats.totalRemaining / 1000)}k TKN
              </span>
            )}
         </div>

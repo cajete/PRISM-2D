@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { GlassPanel } from './shared/GlassPanel';
 import { usePrismStore } from '../store/prismStore';
@@ -145,8 +144,8 @@ const SettingsPanel: React.FC = () => {
           <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-3">Live Token Budget</h3>
           <div className="space-y-2">
             {allStats.map(stat => {
-              const percent = (stat.remainingTokens / stat.maxTokens) * 100;
-              const isExhausted = stat.remainingTokens <= 0;
+              const percent = (stat.totalRemaining / stat.totalMax) * 100;
+              const isExhausted = stat.totalRemaining <= 0;
               return (
                 <div key={stat.name} className="group">
                   <div className="flex justify-between text-[9px] mb-0.5">
@@ -154,7 +153,7 @@ const SettingsPanel: React.FC = () => {
                       {stat.name}
                       {providerStats?.name === stat.name && <span className="ml-1 text-[8px] text-cyan-500">(ACTIVE)</span>}
                     </span>
-                    <span className="font-mono text-slate-400">{Math.floor(stat.remainingTokens / 1000)}k / {Math.floor(stat.maxTokens / 1000)}k</span>
+                    <span className="font-mono text-slate-400">{Math.floor(stat.totalRemaining / 1000)}k / {Math.floor(stat.totalMax / 1000)}k</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div 

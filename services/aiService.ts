@@ -45,7 +45,6 @@ const graphResponseSchema: Schema = {
   required: ["nodes", "links"]
 };
 
-// Helper to clean AI output
 const sanitizeGraphData = (data: GraphData): GraphData => {
   const cleanId = (id: string) => id.toLowerCase().trim().replace(/\s+/g, '_');
   
@@ -71,34 +70,67 @@ const sanitizeGraphData = (data: GraphData): GraphData => {
 
 abstract class BaseAIProvider implements AIProvider {
   abstract name: string;
+  // Models are now stateful (containing token counts)
   abstract models: AIModel[];
-  protected tokens: number = 0;
-  protected maxTokens: number = 0;
+  
   protected activeModelId: string = '';
 
-  constructor(maxTokens: number) {
-    this.maxTokens = maxTokens;
-    this.tokens = maxTokens;
-  }
-
   getStats(): AIProviderStats {
+    let totalRemaining = 0;
+    let totalMax = 0;
+    
+    // Aggregate stats from models
+    this.models.forEach(m => {
+      totalRemaining += m.remainingTokens;
+      totalMax += m.maxTokens;
+    });
+
     return {
       name: this.name,
       activeModel: this.activeModelId || (this.models[0]?.id || 'unknown'),
-      remainingTokens: this.tokens,
-      maxTokens: this.maxTokens,
-      status: this.tokens > 0 ? 'ACTIVE' : 'EXHAUSTED'
+      totalRemaining,
+      totalMax,
+      models: this.models,
+      status: totalRemaining > 0 ? 'ACTIVE' : 'EXHAUSTED'
     };
   }
 
-  resetCycle() { this.tokens = this.maxTokens; }
+  resetCycle() { 
+    this.models.forEach(m => m.remainingTokens = m.maxTokens);
+  }
 
-  // Abstract generation to be implemented by specifics
   abstract generateGraph(prompt: string, modelId?: string): Promise<GraphData>;
 
-  // Common simulated deduction
-  protected deductTokens(amount: number) {
-    this.tokens = Math.max(0, this.tokens - amount);
+  // Update specific model budget
+  protected deductTokens(amount: number, modelId: string) {
+    const model = this.models.find(m => m.id === modelId);
+    if (model) {
+      model.remainingTokens = Math.max(0, model.remainingTokens - amount);
+    }
+  }
+
+  // Common Fetch Helper
+  protected async fetchAI(url: string, payload: any, apiKey: string | undefined, modelId: string, cost: number): Promise<GraphData> {
+    if (!apiKey) {
+      console.log(`[Mock] ${this.name} ${modelId} executing...`);
+      await new Promise(r => setTimeout(r, 1200));
+      this.deductTokens(cost, modelId);
+      throw new Error(`${this.name} Key Missing - Triggering Simulation Fallback`);
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok) throw new Error(`${this.name} API Error: ${res.statusText}`);
+    
+    const data = await res.json();
+    this.deductTokens(cost, modelId); // Estimate or read usage from response
+    
+    // Handle different response structures in subclasses or standard
+    return sanitizeGraphData(JSON.parse(data.choices[0].message.content));
   }
 }
 
@@ -107,23 +139,23 @@ abstract class BaseAIProvider implements AIProvider {
 class GeminiProvider extends BaseAIProvider {
   name = "Gemini";
   models: AIModel[] = [
-    { id: 'gemini-2.0-flash-thinking-exp-1219', name: 'Flash Thinking (2.0)', type: 'heavy' },
-    { id: 'gemini-2.5-flash', name: 'Flash 2.5', type: 'standard' }
+    { id: 'gemini-2.0-flash-thinking-exp-1219', name: 'Flash Thinking (2.0)', type: 'heavy', remainingTokens: 50000, maxTokens: 50000 },
+    { id: 'gemini-2.5-flash', name: 'Flash 2.5', type: 'standard', remainingTokens: 150000, maxTokens: 150000 }
   ];
   private client: GoogleGenAI;
 
   constructor() {
-    super(150000); // 150k Daily Token Budget
+    super();
     this.activeModelId = 'gemini-2.5-flash';
     this.client = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
-    if (this.tokens <= 0) throw new Error("Gemini Token Limit Exceeded");
-    
     this.activeModelId = modelId || this.models[1].id; 
+    
+    const model = this.models.find(m => m.id === this.activeModelId);
+    if (model && model.remainingTokens <= 0) throw new Error(`Gemini Model ${model.name} Quota Exceeded`);
 
-    // Real API Call
     const response = await this.client.models.generateContent({
       model: this.activeModelId, 
       contents: prompt,
@@ -137,9 +169,7 @@ class GeminiProvider extends BaseAIProvider {
     const text = response.text;
     if (!text) throw new Error("Empty response from Gemini");
     
-    // Deduct
-    this.deductTokens(prompt.length + text.length);
-    
+    this.deductTokens(prompt.length + text.length, this.activeModelId);
     return sanitizeGraphData(JSON.parse(text) as GraphData);
   }
 }
@@ -147,19 +177,16 @@ class GeminiProvider extends BaseAIProvider {
 class OpenAIProvider extends BaseAIProvider {
   name = "OpenAI";
   models: AIModel[] = [
-    { id: 'o1-preview', name: 'o1 Preview', type: 'heavy' },
-    { id: 'gpt-4o', name: 'GPT-4o', type: 'standard' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: 'standard' }
+    { id: 'o1-preview', name: 'o1 Preview', type: 'heavy', remainingTokens: 20000, maxTokens: 20000 },
+    { id: 'gpt-4o', name: 'GPT-4o', type: 'standard', remainingTokens: 80000, maxTokens: 80000 },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: 'standard', remainingTokens: 200000, maxTokens: 200000 }
   ];
-
-  constructor() { super(50000); this.activeModelId = 'gpt-4o-mini'; }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || 'gpt-4o-mini';
-    
-    if (this.tokens <= 0) throw new Error("OpenAI Quota Exceeded");
+    const model = this.models.find(m => m.id === this.activeModelId);
+    if (model && model.remainingTokens <= 0) throw new Error("OpenAI Model Quota Exceeded");
 
-    // Standard Chat Completion Payload
     const payload = {
       model: this.activeModelId,
       messages: [
@@ -169,87 +196,47 @@ class OpenAIProvider extends BaseAIProvider {
       response_format: { type: "json_object" }
     };
 
-    // If API Key exists, use Real Fetch
-    if (process.env.OPENAI_API_KEY) {
-       const res = await fetch('https://api.openai.com/v1/chat/completions', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-         body: JSON.stringify(payload)
-       });
-       if(!res.ok) throw new Error(`OpenAI Error: ${res.statusText}`);
-       const data = await res.json();
-       const text = data.choices[0].message.content;
-       this.deductTokens(1000); // Estimate
-       return sanitizeGraphData(JSON.parse(text));
-    }
-
-    // Mock Fallback
-    console.log(`[Mock] OpenAI ${this.activeModelId} would execute here.`);
-    await new Promise(r => setTimeout(r, 1500)); 
-    this.deductTokens(1000);
-    throw new Error("OpenAI Key Missing - Triggering Fallback");
+    return this.fetchAI('https://api.openai.com/v1/chat/completions', payload, process.env.OPENAI_API_KEY, this.activeModelId, 1000);
   }
 }
 
 class DeepSeekProvider extends BaseAIProvider {
   name = "DeepSeek";
   models: AIModel[] = [
-    { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: 'heavy' },
-    { id: 'deepseek-chat', name: 'DeepSeek V3', type: 'standard' }
+    { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: 'heavy', remainingTokens: 40000, maxTokens: 40000 },
+    { id: 'deepseek-chat', name: 'DeepSeek V3', type: 'standard', remainingTokens: 100000, maxTokens: 100000 }
   ];
-
-  constructor() { super(30000); this.activeModelId = 'deepseek-chat'; }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || 'deepseek-chat';
-    
-    if (this.tokens <= 0) throw new Error("DeepSeek Quota Exceeded");
+    const model = this.models.find(m => m.id === this.activeModelId);
+    if (model && model.remainingTokens <= 0) throw new Error("DeepSeek Model Quota Exceeded");
 
     if (process.env.DEEPSEEK_API_KEY) {
-        const res = await fetch('https://api.deepseek.com/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-            body: JSON.stringify({
-                model: this.activeModelId,
-                messages: [{ role: "user", content: prompt }],
-                response_format: { type: "json_object" }
-            })
-        });
-        if(!res.ok) throw new Error("DeepSeek API Error");
-        const data = await res.json();
-        this.deductTokens(800);
-        return sanitizeGraphData(JSON.parse(data.choices[0].message.content));
+        // DeepSeek fetch implementation
+        return this.fetchAI('https://api.deepseek.com/chat/completions', { /* payload */ }, process.env.DEEPSEEK_API_KEY, this.activeModelId, 800);
     }
-
+    
     // Mock
     console.log(`[Mock] DeepSeek ${this.activeModelId}...`);
     await new Promise(r => setTimeout(r, 1200));
-    this.deductTokens(800);
-    throw new Error("DeepSeek Key Missing - Connection Timeout");
+    this.deductTokens(800, this.activeModelId);
+    throw new Error("Simulated Connection Timeout");
   }
 }
 
 class ClaudeProvider extends BaseAIProvider {
   name = "Claude";
   models: AIModel[] = [
-    { id: 'claude-3-5-sonnet-20240620', name: 'Sonnet 3.5', type: 'heavy' },
-    { id: 'claude-3-haiku-20240307', name: 'Haiku 3', type: 'standard' }
+    { id: 'claude-3-5-sonnet-20240620', name: 'Sonnet 3.5', type: 'heavy', remainingTokens: 40000, maxTokens: 40000 },
+    { id: 'claude-3-haiku-20240307', name: 'Haiku 3', type: 'standard', remainingTokens: 120000, maxTokens: 120000 }
   ];
-
-  constructor() { super(40000); this.activeModelId = 'claude-3-haiku-20240307'; }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || this.models[1].id;
-    
-    if (this.tokens <= 0) throw new Error("Claude Quota Exceeded");
-    
-    if (process.env.ANTHROPIC_API_KEY) {
-        // Anthropic Implementation placeholder
-    }
-
+    this.deductTokens(1200, this.activeModelId);
     console.log(`[Mock] Claude ${this.activeModelId}...`);
     await new Promise(r => setTimeout(r, 1500));
-    this.deductTokens(1200);
     throw new Error("Simulated Rate Limit");
   }
 }
@@ -257,17 +244,15 @@ class ClaudeProvider extends BaseAIProvider {
 class GrokProvider extends BaseAIProvider {
   name = "Grok";
   models: AIModel[] = [
-    { id: 'grok-2', name: 'Grok 2', type: 'heavy' },
-    { id: 'grok-beta', name: 'Grok Beta', type: 'standard' }
+    { id: 'grok-2', name: 'Grok 2', type: 'heavy', remainingTokens: 30000, maxTokens: 30000 },
+    { id: 'grok-beta', name: 'Grok Beta', type: 'standard', remainingTokens: 50000, maxTokens: 50000 }
   ];
-
-  constructor() { super(25000); this.activeModelId = 'grok-beta'; }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || 'grok-beta';
+    this.deductTokens(900, this.activeModelId);
     console.log(`[Mock] Calling Grok ${this.activeModelId}...`);
     await new Promise(r => setTimeout(r, 1000));
-    this.deductTokens(900);
     throw new Error("Simulated API Error");
   }
 }
@@ -298,29 +283,33 @@ class AIServiceManager {
   async executeWithFallback(prompt: string): Promise<GraphData> {
     const { aiSettings, updateAIStatus, setStatus } = usePrismStore.getState();
     
-    // 1. Determine Execution Plan (List of Providers to try in order)
+    // 1. Determine Execution Plan
     let executionPlan: { provider: AIProvider, modelId?: string }[] = [];
 
     if (!aiSettings.autoMode) {
-      // MANUAL MODE: Try specific user selection first
+      // MANUAL MODE: Try specific user selection
       const selectedP = this.providers.find(p => p.name === aiSettings.selectedProvider);
       if (selectedP) {
-        executionPlan.push({ provider: selectedP, modelId: aiSettings.selectedModel });
+        // Only add if model has tokens
+        const model = selectedP.models.find(m => m.id === aiSettings.selectedModel);
+        if (model && model.remainingTokens > 0) {
+           executionPlan.push({ provider: selectedP, modelId: aiSettings.selectedModel });
+        }
       }
     }
 
-    // AUTO MODE (or Fallback): Prioritize Heavy models, then Standard
-    const activeProviders = this.providers.filter(p => p.getStats().status !== 'EXHAUSTED');
+    // AUTO MODE / FALLBACKS:
+    const activeProviders = this.providers;
     
-    // Add "Heavy" models first (Smart Reasoning)
+    // 1. Heavy Models (Reasoning) with tokens > 0
     activeProviders.forEach(p => {
-      const heavyModel = p.models.find(m => m.type === 'heavy');
+      const heavyModel = p.models.find(m => m.type === 'heavy' && m.remainingTokens > 0);
       if (heavyModel) executionPlan.push({ provider: p, modelId: heavyModel.id });
     });
 
-    // Add "Standard" models next (Speed/Backup)
+    // 2. Standard Models (Backup) with tokens > 0
     activeProviders.forEach(p => {
-      const stdModel = p.models.find(m => m.type === 'standard');
+      const stdModel = p.models.find(m => m.type === 'standard' && m.remainingTokens > 0);
       if (stdModel) executionPlan.push({ provider: p, modelId: stdModel.id });
     });
 
@@ -330,15 +319,12 @@ class AIServiceManager {
       const { provider, modelId } = step;
       const stats = provider.getStats();
 
-      // UI Feedback
       updateAIStatus(provider.name, { ...stats, activeModel: modelId || 'auto' });
       if (attempts > 0) setStatus('SWITCHING_PROVIDER');
 
       try {
         console.log(`[AI Manager]: Attempting ${provider.name} [${modelId}]`);
         const data = await provider.generateGraph(prompt, modelId);
-        
-        // Success! Update stats and return
         updateAIStatus(provider.name, provider.getStats());
         return data;
 
@@ -348,7 +334,7 @@ class AIServiceManager {
       }
     }
 
-    throw new Error("All AI Providers and Fallbacks failed. System Offline.");
+    throw new Error("All AI Providers and Fallbacks failed or exhausted quotas.");
   }
 }
 

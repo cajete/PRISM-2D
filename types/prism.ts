@@ -58,7 +58,9 @@ export interface AIModel {
   id: string;
   name: string;
   type: AIModelType;
-  costMultiplier?: number;
+  // Granular Token Tracking
+  remainingTokens: number;
+  maxTokens: number;
 }
 
 export interface AISettings {
@@ -70,8 +72,11 @@ export interface AISettings {
 export interface AIProviderStats {
   name: string;
   activeModel: string;
-  remainingTokens: number;
-  maxTokens: number;
+  // Aggregates
+  totalRemaining: number;
+  totalMax: number;
+  // Granular
+  models: AIModel[]; 
   status: 'ACTIVE' | 'EXHAUSTED' | 'RATE_LIMITED' | 'ERROR';
 }
 
