@@ -1,17 +1,141 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { GlassPanel } from './shared/GlassPanel';
 import { usePrismStore } from '../store/prismStore';
+import { aiManager } from '../services/aiService';
+import { Settings, Zap, Cpu, Server } from 'lucide-react';
+import { AIModel } from '../types/prism';
 
 const SettingsPanel: React.FC = () => {
-  // Assuming a future settings slice, for now we can just show/hide based on a placeholder or sidebar logic
-  // Since specific settings state wasn't explicitly requested in the store update yet, we will just render a placeholder
-  // that could be toggled. For now, let's keep it simple.
+  const { 
+    isSettingsOpen, 
+    aiSettings, 
+    setAIAutoMode, 
+    setAIProvider, 
+    setAIModel, 
+    providerStats,
+    ui 
+  } = usePrismStore();
   
+  const [allStats, setAllStats] = useState(aiManager.getAllStats());
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setAllStats(aiManager.getAllStats());
+      const interval = setInterval(() => setAllStats(aiManager.getAllStats()), 2000);
+      return () => clearInterval(interval);
+    }
+  }, [isSettingsOpen]);
+
+  const availableModels: AIModel[] = aiManager.getProviders()
+    .find(p => p.name === aiSettings.selectedProvider)?.models || [];
+
+  const isVisible = ui.isSidebarOpen && isSettingsOpen;
+
   return (
-    <div className="hidden">
-      {/* Placeholder for future settings implementation */}
-    </div>
+    <GlassPanel isOpen={isVisible} positionClasses="bottom-20 left-20" widthClasses="w-[320px]">
+      <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+        <Settings className="w-5 h-5 text-slate-600" />
+        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-700">System Configuration</h2>
+      </div>
+
+      <div className="space-y-6">
+        
+        {/* AUTO MODE TOGGLE */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-500" /> Auto-Pilot Mode
+            </span>
+            <button 
+              onClick={() => setAIAutoMode(!aiSettings.autoMode)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-300 ${aiSettings.autoMode ? 'bg-cyan-500' : 'bg-slate-300'}`}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${aiSettings.autoMode ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400 leading-tight">
+            {aiSettings.autoMode 
+              ? "System prioritizes 'Thinking' models and rotates providers based on quota availability."
+              : "Manual control active. System uses selected provider first."}
+          </p>
+        </div>
+
+        {/* MANUAL OVERRIDE SECTION */}
+        <div className={`transition-opacity duration-300 ${aiSettings.autoMode ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+           <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Manual Override</h3>
+           
+           <div className="space-y-3">
+             <div>
+               <label className="block text-[9px] text-slate-500 font-bold mb-1">PROVIDER ENGINE</label>
+               <div className="relative">
+                 <select 
+                    value={aiSettings.selectedProvider}
+                    onChange={(e) => {
+                       setAIProvider(e.target.value);
+                       const newModels = aiManager.getProviders().find(p => p.name === e.target.value)?.models || [];
+                       if (newModels.length > 0) setAIModel(newModels[0].id);
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium"
+                 >
+                   {aiManager.getProviders().map(p => (
+                     <option key={p.name} value={p.name}>{p.name}</option>
+                   ))}
+                 </select>
+                 <Server className="absolute right-2 top-2 w-3 h-3 text-slate-400 pointer-events-none" />
+               </div>
+             </div>
+
+             <div>
+               <label className="block text-[9px] text-slate-500 font-bold mb-1">MODEL ARCHITECTURE</label>
+               <div className="relative">
+                 <select 
+                    value={aiSettings.selectedModel}
+                    onChange={(e) => setAIModel(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium"
+                 >
+                   {availableModels.map(m => (
+                     <option key={m.id} value={m.id}>
+                        {m.name} {m.type === 'heavy' ? '(Heavy)' : ''}
+                     </option>
+                   ))}
+                 </select>
+                 <Cpu className="absolute right-2 top-2 w-3 h-3 text-slate-400 pointer-events-none" />
+               </div>
+             </div>
+           </div>
+        </div>
+
+        {/* LIVE STATS */}
+        <div className="pt-2 border-t border-slate-100">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-3">Live Token Budget</h3>
+          <div className="space-y-2">
+            {allStats.map(stat => {
+              const percent = (stat.remainingTokens / stat.maxTokens) * 100;
+              const isExhausted = stat.remainingTokens <= 0;
+              return (
+                <div key={stat.name} className="group">
+                  <div className="flex justify-between text-[9px] mb-0.5">
+                    <span className={`font-bold ${providerStats?.name === stat.name ? 'text-cyan-600' : 'text-slate-600'}`}>
+                      {stat.name}
+                      {providerStats?.name === stat.name && <span className="ml-1 text-[8px] text-cyan-500">(ACTIVE)</span>}
+                    </span>
+                    <span className="font-mono text-slate-400">{Math.floor(stat.remainingTokens / 1000)}k / {Math.floor(stat.maxTokens / 1000)}k</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${isExhausted ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
+    </GlassPanel>
   );
 };
 

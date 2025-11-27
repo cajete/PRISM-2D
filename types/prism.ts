@@ -53,9 +53,23 @@ export enum AppStatus {
 
 // --- AI SERVICE TYPES ---
 
+export type AIModelType = 'standard' | 'heavy'; // Heavy = Reasoning/Thinking models
+
+export interface AIModel {
+  id: string;
+  name: string;
+  type: AIModelType;
+}
+
+export interface AISettings {
+  autoMode: boolean; // If true, smart rotation logic is used
+  selectedProvider: string; // Name of manually selected provider
+  selectedModel: string; // ID of manually selected model
+}
+
 export interface AIProviderStats {
   name: string;
-  model: string;
+  activeModel: string;
   remainingTokens: number;
   maxTokens: number;
   status: 'ACTIVE' | 'EXHAUSTED' | 'RATE_LIMITED' | 'ERROR';
@@ -63,7 +77,8 @@ export interface AIProviderStats {
 
 export interface AIProvider {
   name: string;
+  models: AIModel[];
   getStats: () => AIProviderStats;
-  generateGraph: (prompt: string) => Promise<GraphData>;
+  generateGraph: (prompt: string, modelId?: string) => Promise<GraphData>;
   resetCycle: () => void;
 }

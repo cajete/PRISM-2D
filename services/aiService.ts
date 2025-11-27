@@ -1,9 +1,9 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { ResearchNode, GraphData, AIProvider, AIProviderStats } from '../types/prism';
+import { ResearchNode, GraphData, AIProvider, AIProviderStats, AIModel } from '../types/prism';
 import { usePrismStore } from '../store/prismStore';
 
-// --- SHARED SCHEMA & UTILS ---
+// --- SHARED SCHEMA ---
 
 const graphResponseSchema: Schema = {
   type: Type.OBJECT,
@@ -13,7 +13,7 @@ const graphResponseSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          id: { type: Type.STRING, description: "Snake case ID" },
+          id: { type: Type.STRING },
           label: { type: Type.STRING },
           type: { type: Type.STRING },
           summary: { type: Type.STRING },
@@ -45,7 +45,7 @@ const graphResponseSchema: Schema = {
   required: ["nodes", "links"]
 };
 
-// Helper to sanitize data across all providers
+// Helper to sanitize data
 const sanitizeGraphData = (data: GraphData): GraphData => {
   const cleanId = (id: string) => id.toLowerCase().trim().replace(/\s+/g, '_');
   
@@ -67,22 +67,24 @@ const sanitizeGraphData = (data: GraphData): GraphData => {
   return { nodes: uniqueNodes, links };
 };
 
-// --- PROVIDER IMPLEMENTATIONS ---
+// --- BASE PROVIDER CLASS ---
 
-class GeminiProvider implements AIProvider {
-  name = "Gemini";
-  private client: GoogleGenAI;
-  private tokens = 100000; // Simulated Daily Limit
-  private maxTokens = 100000;
+abstract class BaseAIProvider implements AIProvider {
+  abstract name: string;
+  abstract models: AIModel[];
+  protected tokens: number = 0;
+  protected maxTokens: number = 0;
+  protected activeModelId: string = '';
 
-  constructor() {
-    this.client = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  constructor(maxTokens: number) {
+    this.maxTokens = maxTokens;
+    this.tokens = maxTokens;
   }
 
   getStats(): AIProviderStats {
     return {
       name: this.name,
-      model: "gemini-2.5-flash",
+      activeModel: this.activeModelId || (this.models[0]?.id || 'unknown'),
       remainingTokens: this.tokens,
       maxTokens: this.maxTokens,
       status: this.tokens > 0 ? 'ACTIVE' : 'EXHAUSTED'
@@ -91,11 +93,37 @@ class GeminiProvider implements AIProvider {
 
   resetCycle() { this.tokens = this.maxTokens; }
 
-  async generateGraph(prompt: string): Promise<GraphData> {
-    if (this.tokens <= 0) throw new Error("Token limit exceeded");
+  // Abstract generation to be implemented by specifics
+  abstract generateGraph(prompt: string, modelId?: string): Promise<GraphData>;
+
+  protected deductTokens(amount: number) {
+    this.tokens = Math.max(0, this.tokens - amount);
+  }
+}
+
+// --- PROVIDER IMPLEMENTATIONS ---
+
+class GeminiProvider extends BaseAIProvider {
+  name = "Gemini";
+  models: AIModel[] = [
+    { id: 'gemini-2.0-flash-thinking-exp-1219', name: 'Flash Thinking (2.0)', type: 'heavy' },
+    { id: 'gemini-2.5-flash', name: 'Flash 2.5', type: 'standard' }
+  ];
+  private client: GoogleGenAI;
+
+  constructor() {
+    super(150000); // 150k Daily Token Budget
+    this.activeModelId = 'gemini-2.5-flash';
+    this.client = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  }
+
+  async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
+    if (this.tokens <= 0) throw new Error("Gemini Token Limit Exceeded");
+    
+    this.activeModelId = modelId || this.models[1].id; 
 
     const response = await this.client.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: this.activeModelId,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -107,164 +135,188 @@ class GeminiProvider implements AIProvider {
     const text = response.text;
     if (!text) throw new Error("Empty response from Gemini");
     
-    // Estimate usage
-    this.tokens -= (prompt.length / 4) + (text.length / 4);
-    
+    this.deductTokens(prompt.length + text.length);
     return sanitizeGraphData(JSON.parse(text) as GraphData);
   }
 }
 
-class OpenAIProvider implements AIProvider {
+class OpenAIProvider extends BaseAIProvider {
   name = "OpenAI";
-  private tokens = 50000;
-  private maxTokens = 50000;
+  models: AIModel[] = [
+    { id: 'o1-preview', name: 'o1 Preview', type: 'heavy' },
+    { id: 'gpt-4o', name: 'GPT-4o', type: 'standard' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', type: 'standard' }
+  ];
 
-  getStats(): AIProviderStats {
-    return {
-      name: this.name,
-      model: "gpt-4o-mini",
-      remainingTokens: this.tokens,
-      maxTokens: this.maxTokens,
-      status: this.tokens > 0 ? 'ACTIVE' : 'EXHAUSTED'
-    };
-  }
+  constructor() { super(50000); this.activeModelId = 'gpt-4o-mini'; }
 
-  resetCycle() { this.tokens = this.maxTokens; }
-
-  async generateGraph(prompt: string): Promise<GraphData> {
-    // Mock implementation for fallback logic demonstration
-    // In a real app, this would use fetch() to OpenAI API
-    console.log("Fallback to OpenAI...");
+  async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
+    this.activeModelId = modelId || 'gpt-4o-mini';
+    console.log(`[Mock] Calling OpenAI ${this.activeModelId}...`);
+    await new Promise(r => setTimeout(r, 1500)); 
     
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1500));
+    if (this.tokens <= 0) throw new Error("OpenAI Quota Exceeded");
+    this.deductTokens(1000);
+
+    // Simulate fallback trigger since we don't have a real key
+    if (!process.env.OPENAI_API_KEY) throw new Error("OpenAI Key Missing - Triggering Fallback");
     
-    if (this.tokens <= 0) throw new Error("Token limit exceeded");
-    this.tokens -= 500; // Mock deduction
-
-    // Throw error if no key (simulating failure to trigger next fallback)
-    if (!process.env.OPENAI_API_KEY) throw new Error("OpenAI Key Missing - Falling back");
-
-    return { nodes: [], links: [] }; // Placeholder
+    return { nodes: [], links: [] };
   }
 }
 
-class DeepSeekProvider implements AIProvider {
+class DeepSeekProvider extends BaseAIProvider {
   name = "DeepSeek";
-  private tokens = 20000;
-  private maxTokens = 20000;
+  models: AIModel[] = [
+    { id: 'deepseek-reasoner', name: 'DeepSeek R1', type: 'heavy' },
+    { id: 'deepseek-chat', name: 'DeepSeek V3', type: 'standard' }
+  ];
 
-  getStats(): AIProviderStats {
-    return {
-      name: this.name,
-      model: "deepseek-coder",
-      remainingTokens: this.tokens,
-      maxTokens: this.maxTokens,
-      status: this.tokens > 0 ? 'ACTIVE' : 'EXHAUSTED'
-    };
-  }
+  constructor() { super(30000); this.activeModelId = 'deepseek-chat'; }
 
-  resetCycle() { this.tokens = this.maxTokens; }
-
-  async generateGraph(prompt: string): Promise<GraphData> {
-    console.log("Fallback to DeepSeek...");
-    await new Promise(r => setTimeout(r, 1000));
-    if (this.tokens <= 0) throw new Error("Token limit exceeded");
+  async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
+    this.activeModelId = modelId || 'deepseek-chat';
+    console.log(`[Mock] Calling DeepSeek ${this.activeModelId}...`);
+    await new Promise(r => setTimeout(r, 1200));
     
-    // Fallback failure simulation
-    throw new Error("DeepSeek Connection Timeout");
+    if (this.tokens <= 0) throw new Error("DeepSeek Quota Exceeded");
+    this.deductTokens(800);
+    throw new Error("Simulated Connection Timeout");
   }
 }
 
-// --- SERVICE MANAGER (ORCHESTRATOR) ---
+class ClaudeProvider extends BaseAIProvider {
+  name = "Claude";
+  models: AIModel[] = [
+    { id: 'claude-3-5-sonnet', name: 'Sonnet 3.5', type: 'heavy' },
+    { id: 'claude-3-haiku', name: 'Haiku 3', type: 'standard' }
+  ];
+
+  constructor() { super(40000); this.activeModelId = 'claude-3-haiku'; }
+
+  async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
+    this.activeModelId = modelId || 'claude-3-haiku';
+    console.log(`[Mock] Calling Claude ${this.activeModelId}...`);
+    await new Promise(r => setTimeout(r, 1500));
+    this.deductTokens(1200);
+    throw new Error("Simulated Rate Limit");
+  }
+}
+
+class GrokProvider extends BaseAIProvider {
+  name = "Grok";
+  models: AIModel[] = [
+    { id: 'grok-2', name: 'Grok 2', type: 'heavy' },
+    { id: 'grok-beta', name: 'Grok Beta', type: 'standard' }
+  ];
+
+  constructor() { super(25000); this.activeModelId = 'grok-beta'; }
+
+  async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
+    this.activeModelId = modelId || 'grok-beta';
+    console.log(`[Mock] Calling Grok ${this.activeModelId}...`);
+    await new Promise(r => setTimeout(r, 1000));
+    this.deductTokens(900);
+    throw new Error("Simulated API Error");
+  }
+}
+
+// --- SERVICE MANAGER ---
 
 class AIServiceManager {
   private providers: AIProvider[];
-  private activeIndex = 0;
-
+  
   constructor() {
     this.providers = [
       new GeminiProvider(),
       new OpenAIProvider(),
-      new DeepSeekProvider()
+      new DeepSeekProvider(),
+      new ClaudeProvider(),
+      new GrokProvider()
     ];
   }
 
-  getCurrentProvider(): AIProvider {
-    return this.providers[this.activeIndex];
-  }
+  getProviders() { return this.providers; }
 
   getAllStats(): AIProviderStats[] {
     return this.providers.map(p => p.getStats());
   }
 
-  private rotateProvider() {
-    this.activeIndex = (this.activeIndex + 1) % this.providers.length;
-    console.warn(`[AI Manager]: Switching to ${this.providers[this.activeIndex].name}`);
-  }
-
+  // --- SMART ROUTING LOGIC ---
+  
   async executeWithFallback(prompt: string): Promise<GraphData> {
-    const startProviderIndex = this.activeIndex;
-    let attempts = 0;
+    const { aiSettings, updateAIStatus, setStatus } = usePrismStore.getState();
+    
+    let executionPlan: { provider: AIProvider, modelId?: string }[] = [];
 
-    // Loop through providers until success or full cycle
-    while (attempts < this.providers.length) {
-      const currentProvider = this.providers[this.activeIndex];
-      const stats = currentProvider.getStats();
-
-      // Update Store UI
-      usePrismStore.getState().updateAIStatus(currentProvider.name, stats);
-
-      if (stats.status === 'EXHAUSTED') {
-        this.rotateProvider();
-        attempts++;
-        continue;
-      }
-
-      try {
-        console.log(`[AI Manager]: Requesting generation via ${currentProvider.name}...`);
-        const data = await currentProvider.generateGraph(prompt);
-        
-        // Update stats after success
-        usePrismStore.getState().updateAIStatus(currentProvider.name, currentProvider.getStats());
-        return data;
-
-      } catch (error) {
-        console.error(`[AI Manager]: ${currentProvider.name} Failed:`, error);
-        this.rotateProvider();
-        attempts++;
-        
-        // Update UI to show we are switching
-        usePrismStore.getState().setStatus(
-           attempts < this.providers.length ? 'SWITCHING_PROVIDER' : 'ERROR'
-        );
+    if (!aiSettings.autoMode) {
+      // MANUAL MODE: Try specific user selection first
+      const selectedP = this.providers.find(p => p.name === aiSettings.selectedProvider);
+      if (selectedP) {
+        executionPlan.push({ provider: selectedP, modelId: aiSettings.selectedModel });
       }
     }
 
-    throw new Error("All AI Providers failed. Please check API keys or connection.");
+    // AUTO MODE (or Fallback): Prioritize Heavy models, then Standard
+    const activeProviders = this.providers.filter(p => p.getStats().status !== 'EXHAUSTED');
+    
+    // 1. Heavy Models (Reasoning)
+    activeProviders.forEach(p => {
+      const heavyModel = p.models.find(m => m.type === 'heavy');
+      if (heavyModel) executionPlan.push({ provider: p, modelId: heavyModel.id });
+    });
+
+    // 2. Standard Models (Backup)
+    activeProviders.forEach(p => {
+      const stdModel = p.models.find(m => m.type === 'standard');
+      if (stdModel) executionPlan.push({ provider: p, modelId: stdModel.id });
+    });
+
+    let attempts = 0;
+    
+    for (const step of executionPlan) {
+      const { provider, modelId } = step;
+      const stats = provider.getStats();
+
+      // UI Feedback
+      updateAIStatus(provider.name, { ...stats, activeModel: modelId || 'auto' });
+      if (attempts > 0) setStatus('SWITCHING_PROVIDER');
+
+      try {
+        console.log(`[AI Manager]: Attempting ${provider.name} [${modelId}]`);
+        const data = await provider.generateGraph(prompt, modelId);
+        
+        updateAIStatus(provider.name, provider.getStats());
+        return data;
+
+      } catch (error) {
+        console.warn(`[AI Manager]: ${provider.name} Failed:`, error);
+        attempts++;
+      }
+    }
+
+    throw new Error("All AI Providers and Fallbacks failed. System Offline.");
   }
 }
 
 export const aiManager = new AIServiceManager();
 
-// --- EXPORTED FUNCTIONS ---
+// --- EXPORTS ---
 
-export const generateGraphFromTopic = async (topic: string): Promise<GraphData> => {
+export const generateGraphFromTopic = async (topic: string) => {
   const prompt = `
     Generate a knowledge graph for: "${topic}".
     Create 15-20 nodes and 20+ connections.
-    CRITICAL: Use consistent, snake_case IDs.
-    Include 'tags' array.
+    CRITICAL: Use consistent, snake_case IDs. Include 'tags'.
   `;
   return aiManager.executeWithFallback(prompt);
 };
 
-export const findCorrelation = async (nodeA: ResearchNode, nodeB: ResearchNode): Promise<GraphData> => {
+export const findCorrelation = async (nodeA: ResearchNode, nodeB: ResearchNode) => {
   const prompt = `
     Find connections between: "${nodeA.label}" and "${nodeB.label}".
     Create intermediate nodes to bridge them.
     CRITICAL: Re-use exact snake_case IDs.
-    Do not create duplicates.
   `;
   return aiManager.executeWithFallback(prompt);
 };
