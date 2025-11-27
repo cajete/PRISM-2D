@@ -1,0 +1,5 @@
+{
+  "name": "P.R.I.S.M. (2D Edition)",
+  "description": "A high-performance 2D knowledge graph visualizer using HTML5 Canvas and React. Features AI-generated data structures, story mode navigation, and local persistence.",
+  "requestFramePermissions": []
+}
