@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { usePrismStore } from '../store/prismStore';
 import { GROUP_COLORS } from '../constants';
-import { X, Hash, MapPin, Activity, Maximize2, Minimize2, HelpCircle, Tag } from 'lucide-react';
+import { X, Hash, MapPin, Activity, Maximize2, Minimize2, HelpCircle, Tag, Cpu } from 'lucide-react';
 import { GlassPanel } from './shared/GlassPanel';
 
 const DetailPanel: React.FC = () => {
@@ -109,8 +109,30 @@ const DetailPanel: React.FC = () => {
           <p className="text-slate-700 text-sm leading-7 font-light">{selectedNode.summary}</p>
         </div>
         
+        {/* Research Provenance - NEW SECTION */}
+        {selectedNode.researchMetadata && (
+          <div className="mt-4 p-3 bg-white rounded-lg border border-slate-200 shadow-sm relative overflow-hidden group">
+            <div className="absolute right-0 top-0 p-1 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Cpu className="w-16 h-16 text-slate-900" />
+            </div>
+            
+            <div className="flex items-center gap-2 mb-2 text-slate-500 relative z-10">
+               <Cpu className="w-3 h-3" />
+               <div className="text-[10px] font-bold uppercase tracking-widest">AI Research Provenance</div>
+            </div>
+            
+            <div className="flex justify-between items-center text-xs relative z-10">
+               <div className="font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">{selectedNode.researchMetadata.provider}</div>
+               <div className="font-mono text-slate-500 text-[10px] border border-slate-200 px-2 py-1 rounded">{selectedNode.researchMetadata.model}</div>
+            </div>
+            <div className="text-[9px] text-slate-400 text-right mt-2 font-mono relative z-10">
+               {new Date(selectedNode.researchMetadata.timestamp).toLocaleString()}
+            </div>
+          </div>
+        )}
+
         {/* Metadata */}
-        <div>
+        <div className="pt-2">
            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">Coordinates</h3>
            <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-slate-50 p-2 rounded flex items-center justify-between border border-slate-200">
@@ -126,6 +148,7 @@ const DetailPanel: React.FC = () => {
               </div>
            </div>
         </div>
+
       </div>
     </GlassPanel>
   );

@@ -9,6 +9,13 @@ export interface ResearchNode {
   tags?: string[];
   aliases?: string[];
   
+  // AI Provenance
+  researchMetadata?: {
+    provider: string;
+    model: string;
+    timestamp: number;
+  };
+  
   // 2D Visuals
   groupLabel: string;
   metrics: {

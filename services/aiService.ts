@@ -70,16 +70,13 @@ const sanitizeGraphData = (data: GraphData): GraphData => {
 
 abstract class BaseAIProvider implements AIProvider {
   abstract name: string;
-  // Models are now stateful (containing token counts)
   abstract models: AIModel[];
-  
   protected activeModelId: string = '';
 
   getStats(): AIProviderStats {
     let totalRemaining = 0;
     let totalMax = 0;
     
-    // Aggregate stats from models
     this.models.forEach(m => {
       totalRemaining += m.remainingTokens;
       totalMax += m.maxTokens;
@@ -101,7 +98,6 @@ abstract class BaseAIProvider implements AIProvider {
 
   abstract generateGraph(prompt: string, modelId?: string): Promise<GraphData>;
 
-  // Update specific model budget
   protected deductTokens(amount: number, modelId: string) {
     const model = this.models.find(m => m.id === modelId);
     if (model) {
@@ -109,7 +105,6 @@ abstract class BaseAIProvider implements AIProvider {
     }
   }
 
-  // Common Fetch Helper
   protected async fetchAI(url: string, payload: any, apiKey: string | undefined, modelId: string, cost: number): Promise<GraphData> {
     if (!apiKey) {
       console.log(`[Mock] ${this.name} ${modelId} executing...`);
@@ -127,9 +122,7 @@ abstract class BaseAIProvider implements AIProvider {
     if(!res.ok) throw new Error(`${this.name} API Error: ${res.statusText}`);
     
     const data = await res.json();
-    this.deductTokens(cost, modelId); // Estimate or read usage from response
-    
-    // Handle different response structures in subclasses or standard
+    this.deductTokens(cost, modelId);
     return sanitizeGraphData(JSON.parse(data.choices[0].message.content));
   }
 }
@@ -213,11 +206,9 @@ class DeepSeekProvider extends BaseAIProvider {
     if (model && model.remainingTokens <= 0) throw new Error("DeepSeek Model Quota Exceeded");
 
     if (process.env.DEEPSEEK_API_KEY) {
-        // DeepSeek fetch implementation
         return this.fetchAI('https://api.deepseek.com/chat/completions', { /* payload */ }, process.env.DEEPSEEK_API_KEY, this.activeModelId, 800);
     }
     
-    // Mock
     console.log(`[Mock] DeepSeek ${this.activeModelId}...`);
     await new Promise(r => setTimeout(r, 1200));
     this.deductTokens(800, this.activeModelId);
@@ -287,10 +278,8 @@ class AIServiceManager {
     let executionPlan: { provider: AIProvider, modelId?: string }[] = [];
 
     if (!aiSettings.autoMode) {
-      // MANUAL MODE: Try specific user selection
       const selectedP = this.providers.find(p => p.name === aiSettings.selectedProvider);
       if (selectedP) {
-        // Only add if model has tokens
         const model = selectedP.models.find(m => m.id === aiSettings.selectedModel);
         if (model && model.remainingTokens > 0) {
            executionPlan.push({ provider: selectedP, modelId: aiSettings.selectedModel });
@@ -298,16 +287,15 @@ class AIServiceManager {
       }
     }
 
-    // AUTO MODE / FALLBACKS:
     const activeProviders = this.providers;
     
-    // 1. Heavy Models (Reasoning) with tokens > 0
+    // Heavy Models (Reasoning)
     activeProviders.forEach(p => {
       const heavyModel = p.models.find(m => m.type === 'heavy' && m.remainingTokens > 0);
       if (heavyModel) executionPlan.push({ provider: p, modelId: heavyModel.id });
     });
 
-    // 2. Standard Models (Backup) with tokens > 0
+    // Standard Models (Backup)
     activeProviders.forEach(p => {
       const stdModel = p.models.find(m => m.type === 'standard' && m.remainingTokens > 0);
       if (stdModel) executionPlan.push({ provider: p, modelId: stdModel.id });
@@ -325,6 +313,21 @@ class AIServiceManager {
       try {
         console.log(`[AI Manager]: Attempting ${provider.name} [${modelId}]`);
         const data = await provider.generateGraph(prompt, modelId);
+        
+        // --- INJECT PROVENANCE ---
+        const timestamp = Date.now();
+        const finalModelId = modelId || provider.getStats().activeModel;
+        
+        // This injects the metadata into the nodes before they reach the store
+        data.nodes.forEach(node => {
+            node.researchMetadata = {
+                provider: provider.name,
+                model: finalModelId,
+                timestamp: timestamp
+            };
+        });
+        // -------------------------
+
         updateAIStatus(provider.name, provider.getStats());
         return data;
 
