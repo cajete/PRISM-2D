@@ -17,6 +17,7 @@ const SettingsPanel: React.FC = () => {
     ui 
   } = usePrismStore();
   
+  // Local state for stats polling
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
 
   useEffect(() => {
@@ -66,6 +67,7 @@ const SettingsPanel: React.FC = () => {
            <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Manual Override</h3>
            
            <div className="space-y-3">
+             {/* Provider Select */}
              <div>
                <label className="block text-[9px] text-slate-500 font-bold mb-1">PROVIDER ENGINE</label>
                <div className="relative">
@@ -73,10 +75,11 @@ const SettingsPanel: React.FC = () => {
                     value={aiSettings.selectedProvider}
                     onChange={(e) => {
                        setAIProvider(e.target.value);
+                       // Reset model to first available of new provider
                        const newModels = aiManager.getProviders().find(p => p.name === e.target.value)?.models || [];
                        if (newModels.length > 0) setAIModel(newModels[0].id);
                     }}
-                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium"
+                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium appearance-none"
                  >
                    {aiManager.getProviders().map(p => (
                      <option key={p.name} value={p.name}>{p.name}</option>
@@ -86,13 +89,14 @@ const SettingsPanel: React.FC = () => {
                </div>
              </div>
 
+             {/* Model Select */}
              <div>
                <label className="block text-[9px] text-slate-500 font-bold mb-1">MODEL ARCHITECTURE</label>
                <div className="relative">
                  <select 
                     value={aiSettings.selectedModel}
                     onChange={(e) => setAIModel(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium"
+                    className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium appearance-none"
                  >
                    {availableModels.map(m => (
                      <option key={m.id} value={m.id}>

@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ResearchNode, GraphData, AIProvider, AIProviderStats, AIModel } from '../types/prism';
 import { usePrismStore } from '../store/prismStore';
 
-// --- SHARED SCHEMA ---
+// --- SHARED SCHEMA & UTILS ---
 
 const graphResponseSchema: Schema = {
   type: Type.OBJECT,
@@ -45,7 +45,7 @@ const graphResponseSchema: Schema = {
   required: ["nodes", "links"]
 };
 
-// Helper to sanitize data
+// Helper to clean AI output
 const sanitizeGraphData = (data: GraphData): GraphData => {
   const cleanId = (id: string) => id.toLowerCase().trim().replace(/\s+/g, '_');
   
@@ -96,6 +96,7 @@ abstract class BaseAIProvider implements AIProvider {
   // Abstract generation to be implemented by specifics
   abstract generateGraph(prompt: string, modelId?: string): Promise<GraphData>;
 
+  // Common simulated deduction
   protected deductTokens(amount: number) {
     this.tokens = Math.max(0, this.tokens - amount);
   }
@@ -122,8 +123,9 @@ class GeminiProvider extends BaseAIProvider {
     
     this.activeModelId = modelId || this.models[1].id; 
 
+    // Real API Call
     const response = await this.client.models.generateContent({
-      model: this.activeModelId,
+      model: this.activeModelId, 
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -135,7 +137,9 @@ class GeminiProvider extends BaseAIProvider {
     const text = response.text;
     if (!text) throw new Error("Empty response from Gemini");
     
+    // Deduct
     this.deductTokens(prompt.length + text.length);
+    
     return sanitizeGraphData(JSON.parse(text) as GraphData);
   }
 }
@@ -152,16 +156,38 @@ class OpenAIProvider extends BaseAIProvider {
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || 'gpt-4o-mini';
-    console.log(`[Mock] Calling OpenAI ${this.activeModelId}...`);
-    await new Promise(r => setTimeout(r, 1500)); 
     
     if (this.tokens <= 0) throw new Error("OpenAI Quota Exceeded");
-    this.deductTokens(1000);
 
-    // Simulate fallback trigger since we don't have a real key
-    if (!process.env.OPENAI_API_KEY) throw new Error("OpenAI Key Missing - Triggering Fallback");
-    
-    return { nodes: [], links: [] };
+    // Standard Chat Completion Payload
+    const payload = {
+      model: this.activeModelId,
+      messages: [
+        { role: "system", content: "You are a JSON generator for knowledge graphs." },
+        { role: "user", content: prompt + "\nRespond strictly in JSON matching the schema." }
+      ],
+      response_format: { type: "json_object" }
+    };
+
+    // If API Key exists, use Real Fetch
+    if (process.env.OPENAI_API_KEY) {
+       const res = await fetch('https://api.openai.com/v1/chat/completions', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+         body: JSON.stringify(payload)
+       });
+       if(!res.ok) throw new Error(`OpenAI Error: ${res.statusText}`);
+       const data = await res.json();
+       const text = data.choices[0].message.content;
+       this.deductTokens(1000); // Estimate
+       return sanitizeGraphData(JSON.parse(text));
+    }
+
+    // Mock Fallback
+    console.log(`[Mock] OpenAI ${this.activeModelId} would execute here.`);
+    await new Promise(r => setTimeout(r, 1500)); 
+    this.deductTokens(1000);
+    throw new Error("OpenAI Key Missing - Triggering Fallback");
   }
 }
 
@@ -176,27 +202,52 @@ class DeepSeekProvider extends BaseAIProvider {
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
     this.activeModelId = modelId || 'deepseek-chat';
-    console.log(`[Mock] Calling DeepSeek ${this.activeModelId}...`);
-    await new Promise(r => setTimeout(r, 1200));
     
     if (this.tokens <= 0) throw new Error("DeepSeek Quota Exceeded");
+
+    if (process.env.DEEPSEEK_API_KEY) {
+        const res = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+            body: JSON.stringify({
+                model: this.activeModelId,
+                messages: [{ role: "user", content: prompt }],
+                response_format: { type: "json_object" }
+            })
+        });
+        if(!res.ok) throw new Error("DeepSeek API Error");
+        const data = await res.json();
+        this.deductTokens(800);
+        return sanitizeGraphData(JSON.parse(data.choices[0].message.content));
+    }
+
+    // Mock
+    console.log(`[Mock] DeepSeek ${this.activeModelId}...`);
+    await new Promise(r => setTimeout(r, 1200));
     this.deductTokens(800);
-    throw new Error("Simulated Connection Timeout");
+    throw new Error("DeepSeek Key Missing - Connection Timeout");
   }
 }
 
 class ClaudeProvider extends BaseAIProvider {
   name = "Claude";
   models: AIModel[] = [
-    { id: 'claude-3-5-sonnet', name: 'Sonnet 3.5', type: 'heavy' },
-    { id: 'claude-3-haiku', name: 'Haiku 3', type: 'standard' }
+    { id: 'claude-3-5-sonnet-20240620', name: 'Sonnet 3.5', type: 'heavy' },
+    { id: 'claude-3-haiku-20240307', name: 'Haiku 3', type: 'standard' }
   ];
 
-  constructor() { super(40000); this.activeModelId = 'claude-3-haiku'; }
+  constructor() { super(40000); this.activeModelId = 'claude-3-haiku-20240307'; }
 
   async generateGraph(prompt: string, modelId?: string): Promise<GraphData> {
-    this.activeModelId = modelId || 'claude-3-haiku';
-    console.log(`[Mock] Calling Claude ${this.activeModelId}...`);
+    this.activeModelId = modelId || this.models[1].id;
+    
+    if (this.tokens <= 0) throw new Error("Claude Quota Exceeded");
+    
+    if (process.env.ANTHROPIC_API_KEY) {
+        // Anthropic Implementation placeholder
+    }
+
+    console.log(`[Mock] Claude ${this.activeModelId}...`);
     await new Promise(r => setTimeout(r, 1500));
     this.deductTokens(1200);
     throw new Error("Simulated Rate Limit");
@@ -247,6 +298,7 @@ class AIServiceManager {
   async executeWithFallback(prompt: string): Promise<GraphData> {
     const { aiSettings, updateAIStatus, setStatus } = usePrismStore.getState();
     
+    // 1. Determine Execution Plan (List of Providers to try in order)
     let executionPlan: { provider: AIProvider, modelId?: string }[] = [];
 
     if (!aiSettings.autoMode) {
@@ -260,13 +312,13 @@ class AIServiceManager {
     // AUTO MODE (or Fallback): Prioritize Heavy models, then Standard
     const activeProviders = this.providers.filter(p => p.getStats().status !== 'EXHAUSTED');
     
-    // 1. Heavy Models (Reasoning)
+    // Add "Heavy" models first (Smart Reasoning)
     activeProviders.forEach(p => {
       const heavyModel = p.models.find(m => m.type === 'heavy');
       if (heavyModel) executionPlan.push({ provider: p, modelId: heavyModel.id });
     });
 
-    // 2. Standard Models (Backup)
+    // Add "Standard" models next (Speed/Backup)
     activeProviders.forEach(p => {
       const stdModel = p.models.find(m => m.type === 'standard');
       if (stdModel) executionPlan.push({ provider: p, modelId: stdModel.id });
@@ -286,6 +338,7 @@ class AIServiceManager {
         console.log(`[AI Manager]: Attempting ${provider.name} [${modelId}]`);
         const data = await provider.generateGraph(prompt, modelId);
         
+        // Success! Update stats and return
         updateAIStatus(provider.name, provider.getStats());
         return data;
 

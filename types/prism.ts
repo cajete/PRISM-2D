@@ -10,18 +10,17 @@ export interface ResearchNode {
   aliases?: string[];
   
   // 2D Visuals
-  groupLabel: string; // MANDATORY: Used for Color (e.g. "Witnesses" = Blue)
+  groupLabel: string;
   metrics: {
-    significance: number; // 1-10: Used for Node Radius
+    significance: number;
   };
 
-  // Coordinates (Calculated by Engine)
+  // Coordinates
   x?: number;
   y?: number;
 }
 
 // Extends ResearchNode to include D3 internal simulation properties
-// This prevents 'any' casting in the Graph component
 export interface SimulationNode extends ResearchNode {
   x: number;
   y: number;
@@ -32,10 +31,10 @@ export interface SimulationNode extends ResearchNode {
 }
 
 export interface OptimizedConnection {
-  source: string | ResearchNode; // ForceGraph converts string ID to object ref
+  source: string | ResearchNode;
   target: string | ResearchNode;
   relation: string;
-  weight: number; // 0.1 - 1.0 (Link Thickness)
+  weight: number;
 }
 
 export interface GraphData {
@@ -47,7 +46,7 @@ export enum AppStatus {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
   GENERATING = 'GENERATING',
-  SWITCHING_PROVIDER = 'SWITCHING_PROVIDER', // New status for UI feedback
+  SWITCHING_PROVIDER = 'SWITCHING_PROVIDER',
   ERROR = 'ERROR'
 }
 
@@ -59,6 +58,7 @@ export interface AIModel {
   id: string;
   name: string;
   type: AIModelType;
+  costMultiplier?: number;
 }
 
 export interface AISettings {
