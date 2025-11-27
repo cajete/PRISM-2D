@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, Key, BrainCircuit } from 'lucide-react';
+import { Search, Key, BrainCircuit, Settings } from 'lucide-react';
 import { usePrismStore } from '../store/prismStore';
 
 const SidebarButton: React.FC<{
@@ -34,7 +34,16 @@ const SidebarButton: React.FC<{
 );
 
 const Sidebar: React.FC = () => {
-  const { ui, toggleResearchPanel, toggleLegend, toggleSidebar, zoomLevel } = usePrismStore();
+  const { 
+    ui, 
+    toggleResearchPanel, 
+    toggleLegend, 
+    toggleSidebar, 
+    zoomLevel,
+    isSettingsOpen,
+    toggleSettings
+  } = usePrismStore();
+  
   const isOpen = ui.isSidebarOpen;
 
   return (
@@ -45,6 +54,7 @@ const Sidebar: React.FC = () => {
           : 'bg-transparent border-none pointer-events-none'
       }`}
     >
+      {/* P.R.I.S.M. Toggle Icon */}
       <div className="mb-8 pointer-events-auto">
         <button 
           onClick={toggleSidebar}
@@ -57,6 +67,7 @@ const Sidebar: React.FC = () => {
 
       <div className={`flex flex-col items-center w-full h-full transition-all duration-300 ${isOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10 pointer-events-none'}`}>
         
+        {/* Main Tools */}
         <div className="flex flex-col gap-4 w-full px-3">
           <SidebarButton
             icon={<Search className="w-5 h-5" />}
@@ -70,7 +81,8 @@ const Sidebar: React.FC = () => {
 
         <div className="flex-1" />
 
-        <div className="flex flex-col gap-4 w-full px-3 mb-6">
+        {/* Bottom Tools */}
+        <div className="flex flex-col gap-4 w-full px-3 mb-6 items-center">
           <SidebarButton
             icon={<Key className="w-5 h-5" />}
             isActive={ui.isLegendOpen}
@@ -79,13 +91,24 @@ const Sidebar: React.FC = () => {
             colorClass="text-rose-400"
             isSidebarOpen={isOpen}
           />
-        </div>
-        
-        <div className="mb-8 flex flex-col items-center">
-          <span className="text-[8px] font-bold text-slate-400 uppercase mb-1">ZOOM</span>
-          <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 min-w-[32px] text-center">
-             {zoomLevel.toFixed(1)}x
-          </span>
+          
+          <div className="flex flex-col items-center">
+            <span className="text-[8px] font-bold text-slate-400 uppercase mb-1">ZOOM</span>
+            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 min-w-[32px] text-center">
+               {zoomLevel.toFixed(1)}x
+            </span>
+          </div>
+
+          <div className="h-px w-8 bg-slate-200 my-1"></div>
+
+          <SidebarButton
+            icon={<Settings className="w-5 h-5" />}
+            isActive={isSettingsOpen}
+            onClick={toggleSettings}
+            label="System Config"
+            colorClass="text-slate-500"
+            isSidebarOpen={isOpen}
+          />
         </div>
       </div>
     </div>
