@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { usePrismStore } from '../store/prismStore';
-import { generateGraphFromTopic, findCorrelation } from '../services/geminiService';
+import { generateGraphFromTopic, findCorrelation } from '../services/aiService';
 import { AppStatus, ResearchNode } from '../types/prism';
-import { Search, BrainCircuit, AlertCircle, Loader2, MousePointer2, Link2, ArrowRight, X, ChevronDown } from 'lucide-react';
+import { Search, BrainCircuit, AlertCircle, Loader2, MousePointer2, Link2, ArrowRight, X, ChevronDown, Zap, Server } from 'lucide-react';
 import { GROUP_COLORS } from '../constants';
 import { GlassPanel } from './shared/GlassPanel';
 
@@ -124,7 +124,7 @@ const NodeAutocomplete: React.FC<NodeAutocompleteProps> = ({
 
 // --- MAIN COMPONENT ---
 const ResearchPanel: React.FC = () => {
-  const { status, setStatus, addGraphData, saveToDb, nodes, links, hoveredNode, ui, selectedNode } = usePrismStore();
+  const { status, setStatus, addGraphData, saveToDb, nodes, links, hoveredNode, ui, selectedNode, activeProvider, providerStats } = usePrismStore();
   const [activeTab, setActiveTab] = useState<'target' | 'correlation'>('target');
   
   // Target Sequence State
@@ -207,11 +207,32 @@ const ResearchPanel: React.FC = () => {
     setTimeout(() => setStatus(AppStatus.IDLE), 3000);
   };
 
+  // Helper for provider color
+  const getProviderColor = (name: string) => {
+     if (name === 'Gemini') return 'text-cyan-600 bg-cyan-50 border-cyan-100';
+     if (name === 'OpenAI') return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+     if (name === 'DeepSeek') return 'text-violet-600 bg-violet-50 border-violet-100';
+     return 'text-slate-600 bg-slate-50 border-slate-100';
+  };
+
   return (
     <GlassPanel isOpen={isVisible} positionClasses="top-4 left-20">
-      <div className="flex items-center gap-2 mb-4">
-        <BrainCircuit className="w-6 h-6 text-cyan-600" />
-        <h1 className="text-xl font-bold tracking-wider text-slate-900">P.R.I.S.M. <span className="text-xs text-cyan-600 font-normal">v2.0</span></h1>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+           <BrainCircuit className="w-6 h-6 text-cyan-600" />
+           <h1 className="text-xl font-bold tracking-wider text-slate-900">P.R.I.S.M. <span className="text-xs text-cyan-600 font-normal">v2.0</span></h1>
+        </div>
+        
+        {/* AI Provider Status Pill */}
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-bold ${getProviderColor(activeProvider)}`}>
+           <Server className="w-3 h-3" />
+           <span>{activeProvider.toUpperCase()}</span>
+           {providerStats && (
+             <span className="opacity-70 border-l border-current pl-1.5 ml-0.5">
+               {Math.floor(providerStats.remainingTokens / 1000)}k TKN
+             </span>
+           )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -294,6 +315,14 @@ const ResearchPanel: React.FC = () => {
                )}
             </span>
          </div>
+
+         {/* Failover / Switching Status */}
+         {status === 'SWITCHING_PROVIDER' && (
+            <div className="mb-2 flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 p-1.5 rounded border border-amber-200 animate-pulse">
+               <Zap className="w-3 h-3" />
+               <span>Provider limit reached. Rerouting neural pathways...</span>
+            </div>
+         )}
 
          {status === AppStatus.GENERATING && (
            <div className="animate-in fade-in slide-in-from-top-2 duration-300">

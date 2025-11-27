@@ -47,5 +47,23 @@ export enum AppStatus {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
   GENERATING = 'GENERATING',
+  SWITCHING_PROVIDER = 'SWITCHING_PROVIDER', // New status for UI feedback
   ERROR = 'ERROR'
+}
+
+// --- AI SERVICE TYPES ---
+
+export interface AIProviderStats {
+  name: string;
+  model: string;
+  remainingTokens: number;
+  maxTokens: number;
+  status: 'ACTIVE' | 'EXHAUSTED' | 'RATE_LIMITED' | 'ERROR';
+}
+
+export interface AIProvider {
+  name: string;
+  getStats: () => AIProviderStats;
+  generateGraph: (prompt: string) => Promise<GraphData>;
+  resetCycle: () => void;
 }
