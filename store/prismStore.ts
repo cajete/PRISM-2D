@@ -78,7 +78,20 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
     try {
       const nodes = await db.nodes.toArray();
       const links = await db.links.toArray();
-      if (nodes.length > 0) set({ nodes, links });
+      
+      if (nodes.length > 0) {
+        // Patch legacy nodes that might be missing metadata
+        const patchedNodes = nodes.map(n => ({
+          ...n,
+          researchMetadata: n.researchMetadata || {
+            provider: 'System Core',
+            model: 'Legacy Dataset',
+            timestamp: Date.now()
+          }
+        }));
+        
+        set({ nodes: patchedNodes, links });
+      }
     } catch (e) { console.error("DB Load Error", e); }
   },
   saveToDb: async () => {
