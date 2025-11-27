@@ -17,56 +17,39 @@ const SettingsPanel: React.FC = () => {
     ui 
   } = usePrismStore();
   
-  // Local state for stats polling
+  // Local state only for stats polling (which changes independently of selection)
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
-  // Local state for the model dropdown list
-  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
-
-  // 1. INITIALIZATION & POLLING
+  // 1. POLLING EFFECT
   useEffect(() => {
     if (isSettingsOpen) {
       setAllStats(aiManager.getAllStats());
       const interval = setInterval(() => setAllStats(aiManager.getAllStats()), 2000);
-
-      // Initial Sync
-      const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
-      if (currentProvider) {
-        setAvailableModels(currentProvider.models);
-      }
-
       return () => clearInterval(interval);
     }
   }, [isSettingsOpen]);
 
-  // 2. MODEL SYNC EFFECT
-  useEffect(() => {
-    const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
-    if (currentProvider) {
-      setAvailableModels(currentProvider.models);
-    } else {
-      setAvailableModels([]);
-    }
-  }, [aiSettings.selectedProvider]);
+  // 2. DERIVED STATE (Single Source of Truth)
+  // Instead of syncing local state with useEffect, we calculate it directly from props/store.
+  // This guarantees the UI is always in sync with aiSettings.selectedProvider.
+  const currentProviderData = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
+  const availableModels: AIModel[] = currentProviderData ? currentProviderData.models : [];
 
-  // 3. PROVIDER CHANGE HANDLER (Smart Selection)
+  // 3. PROVIDER CHANGE HANDLER
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProviderName = e.target.value;
     
-    // Step A: Get new provider data
-    const providerData = aiManager.getProviders().find(p => p.name === newProviderName);
-    const newModels = providerData ? providerData.models : [];
+    // Get new data based on selection
+    const nextProviderData = aiManager.getProviders().find(p => p.name === newProviderName);
+    const nextModels = nextProviderData ? nextProviderData.models : [];
 
-    // Step B: Update UI State immediately
-    setAvailableModels(newModels);
+    // Update Store: Provider
     setAIProvider(newProviderName);
 
-    // Step C: Smart Model Selection (Pick model with MOST tokens)
-    if (newModels.length > 0) {
-      // Sort by remaining tokens descending
-      const sortedModels = [...newModels].sort((a, b) => b.remainingTokens - a.remainingTokens);
-      const bestModel = sortedModels[0];
-      setAIModel(bestModel.id);
+    // Update Store: Model (Smart Auto-Select best available)
+    if (nextModels.length > 0) {
+      const sortedModels = [...nextModels].sort((a, b) => b.remainingTokens - a.remainingTokens);
+      setAIModel(sortedModels[0].id);
     } else {
       setAIModel('');
     }

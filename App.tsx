@@ -10,7 +10,7 @@ import { usePrismStore } from './store/prismStore';
 import { db } from './db';
 
 const App: React.FC = () => {
-  const { loadFromDb, saveToDb } = usePrismStore();
+  const { loadFromDb, saveToDb, aiSettings, activeProvider, providerStats } = usePrismStore();
 
   useEffect(() => {
     const init = async () => {
@@ -31,6 +31,13 @@ const App: React.FC = () => {
 
     init();
   }, [loadFromDb, saveToDb]);
+
+  // Debug: Track Provider Changes
+  useEffect(() => {
+    console.log('[App System] Active Provider:', activeProvider);
+    console.log('[App System] Settings Preference:', aiSettings.selectedProvider);
+    console.log('[App System] Stats:', providerStats);
+  }, [activeProvider, aiSettings.selectedProvider, providerStats]);
 
   return (
     <div className="relative w-screen h-screen bg-slate-50 overflow-hidden font-sans select-none">
