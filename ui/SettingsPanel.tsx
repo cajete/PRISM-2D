@@ -28,8 +28,24 @@ const SettingsPanel: React.FC = () => {
     }
   }, [isSettingsOpen]);
 
-  const availableModels: AIModel[] = aiManager.getProviders()
-    .find(p => p.name === aiSettings.selectedProvider)?.models || [];
+  // Derived state: Get models for the currently selected provider
+  const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
+  const availableModels: AIModel[] = currentProvider?.models || [];
+
+  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProviderName = e.target.value;
+    
+    // 1. Update Provider in Store
+    setAIProvider(newProviderName);
+    
+    // 2. Find the new provider's default model to prevent mismatch
+    const newProvider = aiManager.getProviders().find(p => p.name === newProviderName);
+    const defaultModel = newProvider?.models[0];
+    
+    if (defaultModel) {
+      setAIModel(defaultModel.id);
+    }
+  };
 
   const isVisible = ui.isSidebarOpen && isSettingsOpen;
 
@@ -73,12 +89,7 @@ const SettingsPanel: React.FC = () => {
                <div className="relative">
                  <select 
                     value={aiSettings.selectedProvider}
-                    onChange={(e) => {
-                       setAIProvider(e.target.value);
-                       // Reset model to first available of new provider
-                       const newModels = aiManager.getProviders().find(p => p.name === e.target.value)?.models || [];
-                       if (newModels.length > 0) setAIModel(newModels[0].id);
-                    }}
+                    onChange={handleProviderChange}
                     className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium appearance-none"
                  >
                    {aiManager.getProviders().map(p => (
