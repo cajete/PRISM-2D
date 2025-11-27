@@ -20,17 +20,18 @@ const SettingsPanel: React.FC = () => {
   // Local state for stats polling
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
-  // Local state for available models to ensure UI stability
+  // Local state for the model dropdown list
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
 
-  // 1. SYNC EFFECT: Ensures local state matches Global Store on mount/update
+  // 1. INITIALIZATION & SYNC
+  // When the panel opens or the provider changes externally (e.g. reset), sync the list.
   useEffect(() => {
     if (isSettingsOpen) {
-      // Refresh Stats
+      // Update Token Stats
       setAllStats(aiManager.getAllStats());
       const interval = setInterval(() => setAllStats(aiManager.getAllStats()), 2000);
 
-      // Sync Model List with currently selected provider in Store
+      // Initialize Model List based on current Store Provider
       const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
       if (currentProvider) {
         setAvailableModels(currentProvider.models);
@@ -38,39 +39,40 @@ const SettingsPanel: React.FC = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isSettingsOpen, aiSettings.selectedProvider]); // Dependency ensures sync if store changes externally
+  }, [isSettingsOpen, aiSettings.selectedProvider]);
 
-  // 2. ROBUST CHANGE HANDLER
+  // 2. ROBUST PROVIDER CHANGE HANDLER
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProviderName = e.target.value;
     
-    // A. Lookup new provider data
-    const newProvider = aiManager.getProviders().find(p => p.name === newProviderName);
-    
-    if (newProvider) {
-      // CRITICAL: Update local state IMMEDIATELY so the dropdown re-renders with new options
-      setAvailableModels(newProvider.models);
+    // Step A: Find the data for the new provider
+    const newProviderData = aiManager.getProviders().find(p => p.name === newProviderName);
+    const newModelList = newProviderData ? newProviderData.models : [];
 
-      // B. Update Global Store Provider
-      setAIProvider(newProviderName);
-      
-      // C. Reset Model Selection (Default to first available model of new provider)
-      // We do this immediately to prevent the store from holding a model ID that doesn't exist on the new provider
-      if (newProvider.models.length > 0) {
-        setAIModel(newProvider.models[0].id);
-      } else {
-        setAIModel('');
-      }
+    // Step B: Update Local State (The Dropdown List)
+    // We do this explicitly to force a re-render of the options
+    setAvailableModels(newModelList);
+
+    // Step C: Update Global Store (The Provider Selection)
+    setAIProvider(newProviderName);
+
+    // Step D: Reset Model Selection
+    // Always default to the first available model of the new provider to avoid invalid states
+    if (newModelList.length > 0) {
+      setAIModel(newModelList[0].id);
+    } else {
+      setAIModel('');
     }
   };
 
   const isVisible = ui.isSidebarOpen && isSettingsOpen;
 
-  // Safeguard: Ensure the dropdown value matches a valid option in the list.
-  // If the store has a stale ID (from previous provider), fallback to first available model visually.
-  const effectiveModelValue = availableModels.some(m => m.id === aiSettings.selectedModel)
+  // VISUAL SAFEGUARD:
+  // Calculate the value to display. If the store's selectedModel isn't in the available list 
+  // (which happens for a split second during switch), fall back to the first available model.
+  const displayModelValue = availableModels.some(m => m.id === aiSettings.selectedModel)
     ? aiSettings.selectedModel
-    : availableModels[0]?.id || "";
+    : (availableModels[0]?.id || "");
 
   return (
     <GlassPanel isOpen={isVisible} positionClasses="bottom-20 left-20" widthClasses="w-[320px]">
@@ -128,7 +130,7 @@ const SettingsPanel: React.FC = () => {
                <label className="block text-[9px] text-slate-500 font-bold mb-1">MODEL ARCHITECTURE</label>
                <div className="relative">
                  <select 
-                    value={effectiveModelValue}
+                    value={displayModelValue}
                     onChange={(e) => setAIModel(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-md py-1.5 pl-2 pr-6 outline-none focus:border-cyan-400 font-medium appearance-none cursor-pointer hover:bg-slate-50"
                  >
