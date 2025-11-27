@@ -5,6 +5,10 @@ export interface ResearchNode {
   type: string;
   summary: string;
   
+  // Deduplication & Metadata
+  tags?: string[];
+  aliases?: string[];
+  
   // 2D Visuals
   groupLabel: string; // MANDATORY: Used for Color (e.g. "Witnesses" = Blue)
   metrics: {

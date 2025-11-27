@@ -1,8 +1,8 @@
-
 import { create } from 'zustand';
 import { ResearchNode, OptimizedConnection, AppStatus } from '../types/prism';
 import { INITIAL_NODES, INITIAL_LINKS } from '../data/mockData';
 import { db } from '../db';
+import { consolidateGraphData } from '../utils/graphUtils';
 
 // --- SLICE INTERFACES ---
 
@@ -12,11 +12,13 @@ interface DataSlice {
   selectedNode: ResearchNode | null;
   hoveredNode: ResearchNode | null;
   status: AppStatus;
+  narrativeMode: boolean;
   
   setGraphData: (nodes: ResearchNode[], links: OptimizedConnection[]) => void;
   addGraphData: (nodes: ResearchNode[], links: OptimizedConnection[]) => void;
   selectNode: (node: ResearchNode | null) => void;
   setHoveredNode: (node: ResearchNode | null) => void;
+  toggleNarrativeMode: () => void;
   setStatus: (status: AppStatus) => void;
   getNodesByGroup: (group: string) => ResearchNode[];
   
@@ -30,13 +32,18 @@ interface UISlice {
     isSidebarOpen: boolean;
     isResearchPanelOpen: boolean;
     isLegendOpen: boolean;
+    isControlPanelOpen: boolean;
+    isCorrelationPanelOpen: boolean;
   };
   zoomLevel: number;
+  isSettingsOpen: boolean;
   
   setZoomLevel: (zoom: number) => void;
   toggleSidebar: () => void;
   toggleResearchPanel: () => void;
   toggleLegend: () => void;
+  triggerCameraReset: number;
+  closeAllPanels: () => void;
 }
 
 // --- STORE IMPLEMENTATION ---
@@ -48,22 +55,33 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
   selectedNode: null,
   hoveredNode: null,
   status: AppStatus.IDLE,
+  narrativeMode: false,
 
   setGraphData: (nodes, links) => set({ nodes, links }),
 
   addGraphData: (newNodes, newLinks) => set((state) => {
-    // Merge preventing duplicates by ID
-    const existingIds = new Set(state.nodes.map(n => n.id));
-    const uniqueNewNodes = newNodes.filter(n => !existingIds.has(n.id));
-    
+    // RUN CONSOLIDATION ENGINE
+    const result = consolidateGraphData(
+      state.nodes, 
+      state.links, 
+      newNodes, 
+      newLinks
+    );
+
+    if (result.mergedCount > 0) {
+      console.log(`[P.R.I.S.M. System]: Consolidated ${result.mergedCount} duplicate entities.`);
+    }
+
+    // Return new state with merged nodes and re-wired links
     return {
-      nodes: [...state.nodes, ...uniqueNewNodes],
-      links: [...state.links, ...newLinks]
+      nodes: [...result.nodes], // Create new array ref to trigger render
+      links: [...result.links]
     };
   }),
 
   selectNode: (node) => set({ selectedNode: node }),
   setHoveredNode: (node) => set({ hoveredNode: node }),
+  toggleNarrativeMode: () => set((state) => ({ narrativeMode: !state.narrativeMode })),
   setStatus: (status) => set({ status }),
   getNodesByGroup: (group) => get().nodes.filter(n => n.groupLabel === group),
 
@@ -90,6 +108,8 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
         summary: n.summary,
         groupLabel: n.groupLabel,
         metrics: n.metrics,
+        tags: n.tags || [],
+        aliases: n.aliases || [],
         x: n.x,
         y: n.y
       }));
@@ -115,18 +135,26 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
   ui: {
     isSidebarOpen: true,
     isResearchPanelOpen: true,
-    isLegendOpen: true
+    isLegendOpen: true,
+    isControlPanelOpen: false,
+    isCorrelationPanelOpen: false
   },
   zoomLevel: 1,
+  isSettingsOpen: false,
+  triggerCameraReset: 0,
 
   setZoomLevel: (zoomLevel) => set({ zoomLevel }),
 
-  toggleSidebar: () => set((state) => ({
-    ui: {
-      ...state.ui,
-      isSidebarOpen: !state.ui.isSidebarOpen
-    }
-  })),
+  toggleSidebar: () => set((state) => {
+    const willClose = state.ui.isSidebarOpen;
+    return {
+      ui: {
+        ...state.ui,
+        isSidebarOpen: !willClose,
+        // We persist the other panel states so they reopen when sidebar opens
+      }
+    };
+  }),
 
   toggleResearchPanel: () => set((state) => ({ 
     ui: { ...state.ui, isResearchPanelOpen: !state.ui.isResearchPanelOpen } 
@@ -134,5 +162,13 @@ export const usePrismStore = create<DataSlice & UISlice>((set, get) => ({
 
   toggleLegend: () => set((state) => ({ 
     ui: { ...state.ui, isLegendOpen: !state.ui.isLegendOpen } 
+  })),
+
+  closeAllPanels: () => set((state) => ({
+    ui: {
+      ...state.ui,
+      isResearchPanelOpen: false,
+      isLegendOpen: false
+    }
   })),
 }));
