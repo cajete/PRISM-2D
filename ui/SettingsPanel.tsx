@@ -21,18 +21,16 @@ const SettingsPanel: React.FC = () => {
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
   // Local state for the model dropdown list
-  // initialized with empty array, populated via useEffect or handler
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
 
   // 1. INITIALIZATION & SYNC
-  // When the panel opens or the provider changes externally (e.g. reset), sync the list.
   useEffect(() => {
     if (isSettingsOpen) {
       // Update Token Stats
       setAllStats(aiManager.getAllStats());
       const interval = setInterval(() => setAllStats(aiManager.getAllStats()), 2000);
 
-      // Initialize Model List based on current Store Provider
+      // Sync Model List with Store State on Open/External Change
       const currentProvider = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
       if (currentProvider) {
         setAvailableModels(currentProvider.models);
@@ -42,23 +40,24 @@ const SettingsPanel: React.FC = () => {
     }
   }, [isSettingsOpen, aiSettings.selectedProvider]);
 
-  // 2. ROBUST PROVIDER CHANGE HANDLER
+  // 2. FIXED PROVIDER CHANGE HANDLER
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProviderName = e.target.value;
     
-    // Step A: Find the data for the new provider
-    const newProviderData = aiManager.getProviders().find(p => p.name === newProviderName);
-    const newModelList = newProviderData ? newProviderData.models : [];
+    // Step A: Get all providers and find the selected one
+    const allProviders = aiManager.getProviders();
+    const selectedProviderData = allProviders.find(p => p.name === newProviderName);
 
-    // Step B: Update Local State (The Dropdown List)
-    // We do this explicitly to force a re-render of the options
+    // Step B: Filter models (extract the models specific to this provider)
+    const newModelList = selectedProviderData ? selectedProviderData.models : [];
+
+    // Step C: Update Local State immediately (Updates the Dropdown Options)
     setAvailableModels(newModelList);
 
-    // Step C: Update Global Store (The Provider Selection)
+    // Step D: Update Global Store (Updates the Provider Selection)
     setAIProvider(newProviderName);
 
-    // Step D: Reset Model Selection
-    // Always default to the first available model of the new provider to avoid invalid states
+    // Step E: Reset Model Selection to the first valid option
     if (newModelList.length > 0) {
       setAIModel(newModelList[0].id);
     } else {
@@ -68,9 +67,7 @@ const SettingsPanel: React.FC = () => {
 
   const isVisible = ui.isSidebarOpen && isSettingsOpen;
 
-  // VISUAL SAFEGUARD:
-  // Calculate the value to display. If the store's selectedModel isn't in the available list 
-  // (which happens for a split second during switch), fall back to the first available model.
+  // Visual Safeguard: Ensure displayed value is valid
   const displayModelValue = availableModels.some(m => m.id === aiSettings.selectedModel)
     ? aiSettings.selectedModel
     : (availableModels[0]?.id || "");
