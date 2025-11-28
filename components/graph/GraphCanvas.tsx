@@ -8,7 +8,7 @@ import { NODE_REL_SIZE, LINK_COLOR, GRAPH_BACKGROUND } from '../../constants';
 import { paintNode, paintLink } from '../../utils/canvasRenderers';
 
 const GraphCanvas: React.FC = () => {
-  // Select specific state to prevent unnecessary re-renders
+  // Selectors: Atomic selection to prevent wastage
   const nodes = usePrismStore(state => state.nodes);
   const links = usePrismStore(state => state.links);
   const selectNode = usePrismStore(state => state.selectNode);
@@ -16,19 +16,23 @@ const GraphCanvas: React.FC = () => {
   const hoveredNode = usePrismStore(state => state.hoveredNode);
   const setHoveredNode = usePrismStore(state => state.setHoveredNode);
   const setZoomLevel = usePrismStore(state => state.setZoomLevel);
-  const resetSignal = usePrismStore(state => (state as any).resetSignal); 
+  const resetSignal = usePrismStore(state => state.resetCameraSignal); 
 
   const graphRef = useRef<ForceGraphMethods | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [dimensions, setDimensions] = useState({ w: window.innerWidth, h: window.innerHeight });
 
-  // 1. Data Sanitization & Memoization
+  // ---------------------------------------------------------------------------
+  // 1. DATA SANITIZATION & MEMOIZATION
+  // D3 mutates objects. We guard against this pollution.
+  // ---------------------------------------------------------------------------
   const graphData = useMemo(() => {
-    // We deep clone only when nodes/links *reference* changes to avoid D3 mutation side-effects
+    // Deep clone nodes to keep Store immutable
     const rawNodes = nodes.map(n => ({ ...n }));
     const nodeIds = new Set(rawNodes.map(n => n.id));
 
+    // Filter broken links
     const validLinks = links
       .map(l => ({
         ...l,
@@ -40,7 +44,9 @@ const GraphCanvas: React.FC = () => {
     return { nodes: rawNodes, links: validLinks };
   }, [nodes, links]);
 
-  // 2. Window Resize Handler
+  // ---------------------------------------------------------------------------
+  // 2. RESPONSIVE LAYOUT
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const handleResize = () => {
       setDimensions({ w: window.innerWidth, h: window.innerHeight });
@@ -49,39 +55,52 @@ const GraphCanvas: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 3. Camera Focus (Triggered on Selection)
+  // ---------------------------------------------------------------------------
+  // 3. CAMERA CONTROL
+  // ---------------------------------------------------------------------------
+  
+  // Auto-Focus on Selection
   useEffect(() => {
     if (selectedNode && graphRef.current) {
         graphRef.current.centerAt(selectedNode.x, selectedNode.y, 800);
         graphRef.current.zoom(2.5, 800);
     }
-  }, [selectedNode?.id]);
+  }, [selectedNode?.id]); // Only trigger on ID change, not coord change
   
-  // 4. Camera Reset Listener
+  // External Reset Signal
   useEffect(() => {
-      if (resetSignal && graphRef.current) {
+      if (resetSignal > 0 && graphRef.current) {
           graphRef.current.zoomToFit(1000, 50);
       }
   }, [resetSignal]);
 
-  // 5. Physics Configuration (On Mount)
+  // ---------------------------------------------------------------------------
+  // 4. PHYSICS ENGINE CONFIGURATION
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const timer = setTimeout(() => {
         if (graphRef.current) {
-            // Strong Repulsion for clean layout
+            // Electrostatic Repulsion: Keeps nodes spread out
             graphRef.current.d3Force('charge')?.strength(-400);
+            
+            // Link Tension: Keeps connected nodes relatively close
             graphRef.current.d3Force('link')?.distance(100);
             
-            // Strict Collision preventing overlap
+            // Hard Collision: Prevents overlaps based on visual radius
             graphRef.current.d3Force('collide', d3.forceCollide((n: any) => {
-              return (Math.sqrt(n.metrics?.significance || 1) * NODE_REL_SIZE) + 12; 
+              const radius = (Math.sqrt(n.metrics?.significance || 1) * NODE_REL_SIZE);
+              return radius + 15; // +Buffer
             }).strength(1).iterations(3));
         }
-    }, 100);
+    }, 100); // Slight delay ensures D3 is initialized
     return () => clearTimeout(timer);
   }, []);
 
-  // 6. Canvas Renderers (Using extracted utilities)
+  // ---------------------------------------------------------------------------
+  // 5. RENDER LOOPS
+  // Using pure callbacks to avoid React render cycle overhead in Canvas
+  // ---------------------------------------------------------------------------
+  
   const handleNodePaint = useCallback((node: any, ctx: CanvasRenderingContext2D, scale: number) => {
     paintNode(node as SimulationNode, ctx, scale, selectedNode?.id, hoveredNode?.id);
   }, [selectedNode?.id, hoveredNode?.id]);
@@ -98,27 +117,33 @@ const GraphCanvas: React.FC = () => {
         height={dimensions.h}
         graphData={graphData}
         backgroundColor={GRAPH_BACKGROUND}
-        nodeLabel="" 
-        minZoom={0.5}
-        maxZoom={3}
-        // Removing cooldownTicks={0} restores default simulation behavior (fluid start)
+        nodeLabel="" // Custom handling via paintNode
+        minZoom={0.001}
+        maxZoom={1000}
+        
+        // Rendering Delegates
         nodeCanvasObject={handleNodePaint}
         linkCanvasObject={handleLinkPaint}
+        nodePointerAreaPaint={(node, color, ctx) => {
+          // Hitbox definition
+          const r = Math.sqrt((node as ResearchNode).metrics.significance) * NODE_REL_SIZE;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(node.x!, node.y!, r + 10, 0, 2 * Math.PI, false); 
+          ctx.fill();
+        }}
+
+        // Interaction Handlers
         onNodeClick={(node) => selectNode(node as ResearchNode)}
         onBackgroundClick={() => selectNode(null)}
         onNodeHover={(node) => setHoveredNode(node as ResearchNode || null)}
         onZoom={(t) => setZoomLevel(t.k)}
+        
+        // Drag Physics
         enableNodeDrag={true}
         onNodeDragEnd={node => {
-          node.fx = node.x;
+          node.fx = node.x; // Fix position after drag
           node.fy = node.y;
-        }}
-        nodePointerAreaPaint={(node, color, ctx) => {
-          const r = Math.sqrt((node as ResearchNode).metrics.significance) * NODE_REL_SIZE;
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(node.x!, node.y!, r + 20, 0, 2 * Math.PI, false); 
-          ctx.fill();
         }}
       />
     </div>

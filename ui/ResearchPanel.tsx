@@ -7,7 +7,9 @@ import { Search, BrainCircuit, AlertCircle, Loader2, MousePointer2, Link2, Arrow
 import { GROUP_COLORS } from '../constants';
 import { GlassPanel } from './shared/GlassPanel';
 
-// --- SUB-COMPONENT: Smart Autocomplete ---
+// -----------------------------------------------------------------------------
+// HELPER: Autocomplete Component
+// -----------------------------------------------------------------------------
 interface NodeAutocompleteProps {
   label: string;
   selectedId: string;
@@ -25,15 +27,18 @@ const NodeAutocomplete: React.FC<NodeAutocompleteProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedNode = nodes.find(n => n.id === selectedId);
 
+  // Sync internal query with external selection
   useEffect(() => {
     if (selectedNode) setQuery(selectedNode.label);
-    else setQuery('');
-  }, [selectedNode]);
+    else if (!isFocused) setQuery('');
+  }, [selectedNode, isFocused]);
 
+  // Click Outside Handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setIsFocused(false);
         if (selectedNode) setQuery(selectedNode.label);
         else setQuery('');
       }
@@ -49,6 +54,7 @@ const NodeAutocomplete: React.FC<NodeAutocompleteProps> = ({
   const handleSelect = (id: string) => {
     onChange(id);
     setIsOpen(false);
+    setIsFocused(false);
   };
 
   const handleInject = () => {
@@ -122,37 +128,33 @@ const NodeAutocomplete: React.FC<NodeAutocompleteProps> = ({
   );
 };
 
-// --- MAIN COMPONENT ---
+// -----------------------------------------------------------------------------
+// MAIN COMPONENT: ResearchPanel
+// The primary command interface for the application.
+// -----------------------------------------------------------------------------
+
 const ResearchPanel: React.FC = () => {
-  const { status, setStatus, addGraphData, saveToDb, nodes, links, hoveredNode, ui, selectedNode, activeProvider, providerStats } = usePrismStore();
+  const { status, setStatus, addGraphData, saveToDb, nodes, links, hoveredNode, ui, selectedNode, activeProvider, providerStats, aiSettings } = usePrismStore();
   const [activeTab, setActiveTab] = useState<'target' | 'correlation'>('target');
   
-  // Target Sequence State
+  // Tab State
   const [topic, setTopic] = useState('');
-  
-  // Correlation Sequence State
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
 
-  // Shared State
+  // Process State
   const [progress, setProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState('');
   const progressTimer = useRef<number | null>(null);
 
   const isVisible = ui.isSidebarOpen && ui.isResearchPanelOpen;
 
-  // --- HANDLERS ---
+  // --- ACTIONS ---
+
   const handleGenerate = async () => {
     if (!topic.trim()) return;
-    setStatus(AppStatus.GENERATING);
-    setProgress(5);
-    setLoadingStage("Initializing Neural Handshake...");
+    startLoading("Initializing Neural Handshake...");
     
-    if (progressTimer.current) clearInterval(progressTimer.current);
-    progressTimer.current = window.setInterval(() => {
-      setProgress((prev) => prev >= 92 ? 92 : prev + Math.random() * 8);
-    }, 400);
-
     try {
       const data = await generateGraphFromTopic(topic);
       finishLoading("Integration Complete.", data);
@@ -167,21 +169,26 @@ const ResearchPanel: React.FC = () => {
     const nodeB = nodes.find(n => n.id === targetId);
     if (!nodeA || !nodeB) return;
 
-    setStatus(AppStatus.GENERATING);
-    setProgress(5);
-    setLoadingStage(`Locking Targets: ${nodeA.label} <-> ${nodeB.label}`);
+    startLoading(`Locking Targets: ${nodeA.label} <-> ${nodeB.label}`);
     
-    if (progressTimer.current) clearInterval(progressTimer.current);
-    progressTimer.current = window.setInterval(() => {
-      setProgress((prev) => prev >= 90 ? 90 : prev + Math.random() * 5);
-    }, 500);
-
     try {
       const data = await findCorrelation(nodeA, nodeB);
       finishLoading("Correlation Established.", data);
     } catch (e) {
       handleError(e);
     }
+  };
+
+  // --- UTILS ---
+
+  const startLoading = (stage: string) => {
+    setStatus(AppStatus.GENERATING);
+    setProgress(5);
+    setLoadingStage(stage);
+    if (progressTimer.current) clearInterval(progressTimer.current);
+    progressTimer.current = window.setInterval(() => {
+      setProgress((prev) => prev >= 92 ? 92 : prev + Math.random() * 8);
+    }, 400);
   };
 
   const finishLoading = (msg: string, data: any) => {
@@ -207,7 +214,6 @@ const ResearchPanel: React.FC = () => {
     setTimeout(() => setStatus(AppStatus.IDLE), 3000);
   };
 
-  // Helper for provider color
   const getProviderColor = (name: string) => {
      if (name === 'Gemini') return 'text-cyan-600 bg-cyan-50 border-cyan-100';
      if (name === 'OpenAI') return 'text-emerald-600 bg-emerald-50 border-emerald-100';
@@ -215,27 +221,24 @@ const ResearchPanel: React.FC = () => {
      return 'text-slate-600 bg-slate-50 border-slate-100';
   };
 
+  const displayProvider = !aiSettings.autoMode ? aiSettings.selectedProvider : activeProvider;
+
   return (
     <GlassPanel isOpen={isVisible} positionClasses="top-4 left-20">
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
            <BrainCircuit className="w-6 h-6 text-cyan-600" />
            <h1 className="text-xl font-bold tracking-wider text-slate-900">P.R.I.S.M. <span className="text-xs text-cyan-600 font-normal">v2.0</span></h1>
         </div>
         
-        {/* AI Provider Status Pill */}
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-bold ${getProviderColor(activeProvider)}`}>
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-bold ${getProviderColor(displayProvider)}`}>
            <Server className="w-3 h-3" />
-           <span>{activeProvider.toUpperCase()}</span>
-           {providerStats && (
-             <span className="opacity-70 border-l border-current pl-1.5 ml-0.5">
-               {Math.floor(providerStats.totalRemaining / 1000)}k TKN
-             </span>
-           )}
+           <span>{displayProvider.toUpperCase()}</span>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* TABS */}
       <div className="flex bg-slate-100 p-1 rounded-lg mb-5">
         <button 
           onClick={() => setActiveTab('target')}
@@ -251,7 +254,7 @@ const ResearchPanel: React.FC = () => {
         </button>
       </div>
       
-      {/* Content Area */}
+      {/* INPUT AREA */}
       <div className="min-h-[140px]">
         {activeTab === 'target' ? (
           <div className="animate-in fade-in slide-in-from-left-2 duration-300">
@@ -283,7 +286,9 @@ const ResearchPanel: React.FC = () => {
                 nodes={nodes}
                 globalSelectedNode={selectedNode}
              />
-             <div className="flex justify-center -my-1 relative z-10"><div className="bg-slate-100 p-1 rounded-full"><ArrowRight className="w-3 h-3 text-slate-400 rotate-90" /></div></div>
+             <div className="flex justify-center -my-1 relative z-10">
+               <div className="bg-slate-100 p-1 rounded-full"><ArrowRight className="w-3 h-3 text-slate-400 rotate-90" /></div>
+             </div>
              <NodeAutocomplete 
                 label="TARGET"
                 selectedId={targetId}
@@ -303,7 +308,7 @@ const ResearchPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Shared Status / Progress Section */}
+      {/* FOOTER / STATUS */}
       <div className="mt-4 pt-4 border-t border-slate-200">
          <div className="flex items-center gap-2 h-4 mb-2">
             <MousePointer2 className={`w-3 h-3 ${hoveredNode ? 'text-cyan-500' : 'text-slate-300'}`} />
@@ -316,7 +321,6 @@ const ResearchPanel: React.FC = () => {
             </span>
          </div>
 
-         {/* Failover / Switching Status */}
          {status === 'SWITCHING_PROVIDER' && (
             <div className="mb-2 flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 p-1.5 rounded border border-amber-200 animate-pulse">
                <Zap className="w-3 h-3" />

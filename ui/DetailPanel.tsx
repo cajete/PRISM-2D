@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { usePrismStore } from '../store/prismStore';
 import { GROUP_COLORS } from '../constants';
-import { X, Hash, MapPin, Activity, Maximize2, Minimize2, HelpCircle, Tag, Cpu, Database, Calendar } from 'lucide-react';
+import { X, Hash, MapPin, Activity, Maximize2, Minimize2, HelpCircle, Tag, Cpu } from 'lucide-react';
 import { GlassPanel } from './shared/GlassPanel';
 
 const DetailPanel: React.FC = () => {
@@ -11,18 +11,10 @@ const DetailPanel: React.FC = () => {
 
   if (!selectedNode) return null;
 
-  // IMPORTANT: Ensure the panel hides if the sidebar closes
   const isVisible = ui.isSidebarOpen;
   if (!isVisible) return null;
 
   const color = GROUP_COLORS[selectedNode.groupLabel] || GROUP_COLORS.default;
-
-  // Fallback for nodes that might still lack metadata in transient states
-  const provenance = selectedNode.researchMetadata || {
-    provider: 'System Core',
-    model: 'Pre-loaded',
-    timestamp: Date.now()
-  };
 
   return (
     <GlassPanel 
@@ -116,44 +108,15 @@ const DetailPanel: React.FC = () => {
           <p className="text-slate-700 text-sm leading-7 font-light">{selectedNode.summary}</p>
         </div>
         
-        {/* Research Provenance - ALWAYS VISIBLE */}
-        <div className="mt-6 pt-4 border-t border-slate-200">
-           <div className="flex items-center gap-2 mb-3 text-slate-500">
-              <Cpu className="w-3 h-3" />
-              <h3 className="text-[10px] font-bold uppercase tracking-widest">Research Provenance</h3>
-           </div>
-           
-           <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm grid grid-cols-2 gap-4">
-              <div>
-                 <div className="text-[9px] text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">
-                    <Database className="w-2.5 h-2.5" /> Provider
-                 </div>
-                 <div className="text-xs font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-100 inline-block">
-                    {provenance.provider}
-                 </div>
-              </div>
-              
-              <div>
-                 <div className="text-[9px] text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">
-                    <Cpu className="w-2.5 h-2.5" /> Architecture
-                 </div>
-                 <div className="text-xs font-mono text-slate-600 truncate" title={provenance.model}>
-                    {provenance.model}
-                 </div>
-              </div>
-
-              <div className="col-span-2 pt-2 border-t border-slate-50">
-                 <div className="flex justify-between items-center">
-                    <span className="text-[9px] text-slate-400 flex items-center gap-1">
-                       <Calendar className="w-2.5 h-2.5" /> Timestamp
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                       {new Date(provenance.timestamp).toLocaleString()}
-                    </span>
-                 </div>
-              </div>
-           </div>
-        </div>
+        {/* Research Provenance - Exact Request Implementation */}
+        {selectedNode.researchMetadata && (
+          <div className="mt-4 p-3 bg-slate-50 rounded border border-slate-200">
+            <div className="text-xs font-bold text-slate-500 uppercase mb-1">AI Research Provenance</div>
+            <div className="text-sm text-slate-700">Provider: <span className="font-semibold">{selectedNode.researchMetadata.provider}</span></div>
+            <div className="text-sm text-slate-700">Model: <span className="font-mono text-xs">{selectedNode.researchMetadata.model}</span></div>
+            <div className="text-xs text-slate-400 mt-1">{new Date(selectedNode.researchMetadata.timestamp).toLocaleString()}</div>
+          </div>
+        )}
 
         {/* Metadata */}
         <div className="pt-2">

@@ -40,11 +40,11 @@ const Sidebar: React.FC = () => {
     toggleLegend, 
     toggleSidebar, 
     zoomLevel,
-    isSettingsOpen,
     toggleSettings
   } = usePrismStore();
   
   const isOpen = ui.isSidebarOpen;
+  const isSettingsOpen = ui.isSettingsOpen;
 
   return (
     <div 

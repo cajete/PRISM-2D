@@ -1,197 +1,161 @@
 
 import { ResearchNode, OptimizedConnection } from '../types/prism';
 
-const MOCK_TIMESTAMP = Date.now();
-
+// The Genesis State: Ancient Astronaut & Future Human Theory
 export const INITIAL_NODES: ResearchNode[] = [
-  { 
-    id: "cia", 
-    label: "CIA", 
-    type: "Intelligence Agency", 
-    summary: "Central Intelligence Agency of the United States.", 
-    groupLabel: "Organization", 
-    metrics: { significance: 10 }, 
-    tags: ["USA", "Espionage", "Government"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "ancient_astronaut_theory",
+    label: "Ancient Astronaut Theory",
+    type: "Hypothesis",
+    summary: "The pseudo-scientific hypothesis that intelligent extraterrestrial beings visited Earth and made contact with humans in antiquity and prehistoric times, influencing the development of human cultures, technologies, and religions.",
+    groupLabel: "Concept",
+    tags: ["paleocontact", "extraterrestrials", "history", "mythology"],
+    metrics: { significance: 10 }
   },
-  { 
-    id: "kgb", 
-    label: "KGB", 
-    type: "Intelligence Agency", 
-    summary: "Main security agency for the Soviet Union.", 
-    groupLabel: "Organization", 
-    metrics: { significance: 10 }, 
-    tags: ["USSR", "Espionage", "Government"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "ancient_aliens",
+    label: "Ancient Aliens",
+    type: "Entity Group",
+    summary: "Refers to the theoretical extraterrestrial visitors who are alleged to have guided human civilization, often interpreted as 'gods' in ancient texts.",
+    groupLabel: "Organization",
+    tags: ["gods", "visitors", "sky_people"],
+    metrics: { significance: 9 }
   },
-  { 
-    id: "jfk", 
-    label: "John F. Kennedy", 
-    type: "President", 
-    summary: "35th President of the United States.", 
-    groupLabel: "Person", 
-    metrics: { significance: 9 }, 
-    tags: ["USA", "Politics", "Leader"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "ufo_phenomenon",
+    label: "UFO Phenomenon",
+    type: "Technology",
+    summary: "Unidentified Flying Objects. Within this graph, they are the physical manifestation of either extraterrestrial visitation or temporal displacement technology.",
+    groupLabel: "Technology",
+    tags: ["uap", "saucers", "aerial_phenomena"],
+    metrics: { significance: 9 }
   },
-  { 
-    id: "khrushchev", 
-    label: "Nikita Khrushchev", 
-    type: "Premier", 
-    summary: "First Secretary of the Communist Party of the Soviet Union.", 
-    groupLabel: "Person", 
-    metrics: { significance: 9 }, 
-    tags: ["USSR", "Politics", "Leader"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "future_human_theory",
+    label: "Future Human Theory",
+    type: "Hypothesis",
+    summary: "The hypothesis proposing that 'aliens' (specifically the Greys) are actually humans from a distant future who have traveled back in time to study or repair their own genetic timeline.",
+    groupLabel: "Concept",
+    tags: ["time_travel", "evolution", "chronology"],
+    metrics: { significance: 8 }
   },
-  { 
-    id: "berlin_wall", 
-    label: "Berlin Wall", 
-    type: "Fortification", 
-    summary: "Concrete barrier dividing Berlin from 1961 to 1989.", 
-    groupLabel: "Location", 
-    metrics: { significance: 8 }, 
-    tags: ["Germany", "Cold War", "Border"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "alien_abduction",
+    label: "Alien Abduction",
+    type: "Event",
+    summary: "The subjective experience of being forcibly taken by non-human entities, often associated with medical examinations and reproductive procedures.",
+    groupLabel: "Event",
+    tags: ["missing_time", "examination", "psychology"],
+    metrics: { significance: 7 }
   },
-  { 
-    id: "cuban_missile_crisis", 
-    label: "Cuban Missile Crisis", 
-    type: "Conflict", 
-    summary: "1 month, 4 day confrontation between US and USSR.", 
-    groupLabel: "Event", 
-    metrics: { significance: 10 }, 
-    tags: ["Nuclear", "Cold War", "Cuba"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "genetic_manipulation",
+    label: "Genetic Manipulation",
+    type: "Science",
+    summary: "A core bridge concept linking Ancient Aliens (creating humans) and Future Humans (repairing degrading DNA). Suggests humanity is a designed or managed species.",
+    groupLabel: "Technology",
+    tags: ["dna", "hybridization", "evolution"],
+    metrics: { significance: 8 }
   },
-  { 
-    id: "iron_curtain", 
-    label: "Iron Curtain", 
-    type: "Geopolitical", 
-    summary: "Boundary dividing Europe into two separate areas.", 
-    groupLabel: "Concept", 
-    metrics: { significance: 7 }, 
-    tags: ["Europe", "Cold War", "Ideology"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "ancient_martian_civilization",
+    label: "Ancient Martian Civilization",
+    type: "Civilization",
+    summary: "The theory that Mars once hosted a complex civilization that was destroyed by a cataclysm, potentially forcing survivors to migrate to Earth, seeding human life.",
+    groupLabel: "Location",
+    tags: ["cydonia", "mars", "panspermia"],
+    metrics: { significance: 7 }
   },
-  { 
-    id: "u2_incident", 
-    label: "U-2 Incident", 
-    type: "Incident", 
-    summary: "US spy plane shot down over Soviet airspace.", 
-    groupLabel: "Event", 
-    metrics: { significance: 6 }, 
-    tags: ["Espionage", "Aircraft", "USSR"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "cydonia_region",
+    label: "Cydonia Mensae",
+    type: "Location",
+    summary: "A region on Mars containing the 'Face on Mars' and pyramid-like structures, often cited as evidence of artificial construction by an ancient civilization.",
+    groupLabel: "Location",
+    tags: ["face_on_mars", "anomalies", "pareidolia"],
+    metrics: { significance: 6 }
   },
-  { 
-    id: "francis_gary_powers", 
-    label: "Francis Gary Powers", 
-    type: "Pilot", 
-    summary: "American pilot whose U-2 was shot down.", 
-    groupLabel: "Person", 
-    metrics: { significance: 5 }, 
-    tags: ["USA", "Espionage", "Pilot"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "alien_autopsy",
+    label: "Alien Autopsy",
+    type: "Event",
+    summary: "Refers to the controversial 1995 film footage allegedly depicting a medical examination of a recovery extraterrestrial from the Roswell incident.",
+    groupLabel: "Event",
+    tags: ["roswell", "disinformation", "hoax"],
+    metrics: { significance: 5 }
   },
-  { 
-    id: "nuclear_deterrence", 
-    label: "Nuclear Deterrence", 
-    type: "Strategy", 
-    summary: "Military strategy under Mutually Assured Destruction.", 
-    groupLabel: "Concept", 
-    metrics: { significance: 8 }, 
-    tags: ["War", "Strategy", "Nuclear"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "roswell_incident",
+    label: "Roswell Incident (1947)",
+    type: "Event",
+    summary: "The recovery of balloon debris (or a craft) in New Mexico. The seminal event of modern UFOlogy and the catalyst for government cover-up conspiracy theories.",
+    groupLabel: "Event",
+    tags: ["crash_retrieval", "coverup", "military"],
+    metrics: { significance: 8 }
   },
-  { 
-    id: "fidel_castro", 
-    label: "Fidel Castro", 
-    type: "Leader", 
-    summary: "Revolutionary and politician of Cuba.", 
-    groupLabel: "Person", 
-    metrics: { significance: 8 }, 
-    tags: ["Cuba", "Politics", "Revolution"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "erich_von_daniken",
+    label: "Erich von Däniken",
+    type: "Person",
+    summary: "Swiss author of 'Chariots of the Gods?', responsible for popularizing the Ancient Astronaut theory in mainstream culture.",
+    groupLabel: "Person",
+    tags: ["author", "chariots", "archaeology"],
+    metrics: { significance: 6 }
   },
-  { 
-    id: "bay_of_pigs", 
-    label: "Bay of Pigs", 
-    type: "Invasion", 
-    summary: "Failed landing operation on the southwestern coast of Cuba.", 
-    groupLabel: "Event", 
-    metrics: { significance: 7 }, 
-    tags: ["Cuba", "USA", "Military"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "nazca_lines",
+    label: "Nazca Lines",
+    type: "Location",
+    summary: "Large geoglyphs in Peru. Theorized by proponents to be landing strips or navigational aids for ancient spacecraft.",
+    groupLabel: "Location",
+    tags: ["peru", "geoglyphs", "archaeology"],
+    metrics: { significance: 6 }
   },
-  { 
-    id: "u2_plane", 
-    label: "Lockheed U-2", 
-    type: "Aircraft", 
-    summary: "High altitude reconnaissance aircraft.", 
-    groupLabel: "Technology", 
-    metrics: { significance: 6 }, 
-    tags: ["Aviation", "Espionage", "Technology"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "the_greys",
+    label: "The Greys",
+    type: "Entity Group",
+    summary: "The archetypal alien image. In Future Human Theory, they represent the terminal point of human evolution—atrophied bodies, large craniums, and loss of emotional capacity.",
+    groupLabel: "Organization",
+    tags: ["biology", "future_humans", "abductors"],
+    metrics: { significance: 7 }
   },
-  { 
-    id: "checkoint_charlie", 
-    label: "Checkpoint Charlie", 
-    type: "Crossing", 
-    summary: "Best-known Berlin Wall crossing point.", 
-    groupLabel: "Location", 
-    metrics: { significance: 5 }, 
-    tags: ["Berlin", "Border", "Cold War"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
-  },
-  { 
-    id: "stasi", 
-    label: "Stasi", 
-    type: "Secret Police", 
-    summary: "State Security Service of East Germany.", 
-    groupLabel: "Organization", 
-    metrics: { significance: 6 }, 
-    tags: ["Germany", "Espionage", "Police"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
-  },
-  { 
-    id: "usa", 
-    label: "USA", 
-    type: "Country", 
-    summary: "United States of America", 
-    groupLabel: "Location", 
-    metrics: { significance: 10 }, 
-    tags: ["North America", "Superpower"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
-  },
-  { 
-    id: "ussr", 
-    label: "USSR", 
-    type: "Country", 
-    summary: "Soviet Union", 
-    groupLabel: "Location", 
-    metrics: { significance: 10 }, 
-    tags: ["Asia", "Europe", "Superpower"],
-    researchMetadata: { provider: "System Core", model: "Initial Dataset", timestamp: MOCK_TIMESTAMP }
+  {
+    id: "panspermia",
+    label: "Directed Panspermia",
+    type: "Hypothesis",
+    summary: "The hypothesis that life on Earth was deliberately seeded by an advanced extraterrestrial civilization.",
+    groupLabel: "Concept",
+    tags: ["origin_of_life", "seeding", "biology"],
+    metrics: { significance: 6 }
   }
 ];
 
 export const INITIAL_LINKS: OptimizedConnection[] = [
-    { source: "jfk", target: "usa", relation: "LEADER_OF", weight: 1.0 },
-    { source: "khrushchev", target: "ussr", relation: "LEADER_OF", weight: 1.0 },
-    { source: "cia", target: "usa", relation: "AGENCY_OF", weight: 0.9 },
-    { source: "kgb", target: "ussr", relation: "AGENCY_OF", weight: 0.9 },
-    { source: "jfk", target: "cuban_missile_crisis", relation: "KEY_FIGURE", weight: 1.0 },
-    { source: "khrushchev", target: "cuban_missile_crisis", relation: "KEY_FIGURE", weight: 1.0 },
-    { source: "fidel_castro", target: "cuban_missile_crisis", relation: "INVOLVED", weight: 0.9 },
-    { source: "fidel_castro", target: "bay_of_pigs", relation: "DEFENDED", weight: 0.8 },
-    { source: "cia", target: "bay_of_pigs", relation: "ORCHESTRATED", weight: 0.8 },
-    { source: "berlin_wall", target: "iron_curtain", relation: "PART_OF", weight: 0.7 },
-    { source: "checkoint_charlie", target: "berlin_wall", relation: "LOCATED_AT", weight: 0.6 },
-    { source: "u2_plane", target: "u2_incident", relation: "INVOLVED", weight: 0.9 },
-    { source: "francis_gary_powers", target: "u2_incident", relation: "PILOTED", weight: 0.9 },
-    { source: "u2_plane", target: "cia", relation: "OPERATED_BY", weight: 0.7 },
-    { source: "nuclear_deterrence", target: "cuban_missile_crisis", relation: "CONCEPT_OF", weight: 0.5 },
-    { "source": "stasi", "target": "berlin_wall", "relation": "PATROLLED", "weight": 0.6 },
-    { "source": "jfk", "target": "khrushchev", "relation": "OPPONENT", "weight": 0.8 }
+  // Ancient Astronaut Cluster
+  { source: "ancient_astronaut_theory", target: "ancient_aliens", relation: "POSTULATES_EXISTENCE_OF", weight: 1.0 },
+  { source: "erich_von_daniken", target: "ancient_astronaut_theory", relation: "POPULARIZED", weight: 0.9 },
+  { source: "ancient_aliens", target: "genetic_manipulation", relation: "PERFORMED", weight: 0.8 },
+  { source: "ancient_aliens", target: "nazca_lines", relation: "ALLEGEDLY_CONSTRUCTED", weight: 0.6 },
+  { source: "ancient_aliens", target: "panspermia", relation: "EXECUTED", weight: 0.7 },
+
+  // Mars Cluster
+  { source: "ancient_martian_civilization", target: "cydonia_region", relation: "LOCATED_AT", weight: 0.9 },
+  { source: "ancient_martian_civilization", target: "ancient_aliens", relation: "POSSIBLE_ORIGIN_OF", weight: 0.7 },
+  { source: "ancient_martian_civilization", target: "panspermia", relation: "SEEDED_EARTH_VIA", weight: 0.5 },
+
+  // UFO / Roswell Cluster
+  { source: "roswell_incident", target: "ufo_phenomenon", relation: "CATALYST_EVENT", weight: 0.9 },
+  { source: "alien_autopsy", target: "roswell_incident", relation: "ALLEGED_AFTERMATH", weight: 0.8 },
+  { source: "alien_abduction", target: "ufo_phenomenon", relation: "ASSOCIATED_WITH", weight: 0.9 },
+  
+  // Future Human Theory (The Bridge)
+  { source: "future_human_theory", target: "ufo_phenomenon", relation: "REINTERPRETS", weight: 0.8 },
+  { source: "future_human_theory", target: "ancient_astronaut_theory", relation: "CHALLENGES", weight: 0.7 },
+  { source: "the_greys", target: "future_human_theory", relation: "IDENTIFIED_AS_HUMANS", weight: 0.9 },
+  { source: "the_greys", target: "alien_abduction", relation: "PERPETRATORS_OF", weight: 0.8 },
+  { source: "future_human_theory", target: "genetic_manipulation", relation: "SEEKS_TO_CORRECT", weight: 0.8 },
+  
+  // Cross-Pollination
+  { source: "ufo_phenomenon", target: "ancient_aliens", relation: "MODERN_MANIFESTATION", weight: 0.6 }
 ];

@@ -8,7 +8,6 @@ import { AIModel } from '../types/prism';
 
 const SettingsPanel: React.FC = () => {
   const { 
-    isSettingsOpen, 
     aiSettings, 
     setAIAutoMode, 
     setAIProvider, 
@@ -17,6 +16,8 @@ const SettingsPanel: React.FC = () => {
     ui 
   } = usePrismStore();
   
+  const isSettingsOpen = ui.isSettingsOpen;
+
   // Local state only for stats polling (which changes independently of selection)
   const [allStats, setAllStats] = useState(aiManager.getAllStats());
   
@@ -30,8 +31,6 @@ const SettingsPanel: React.FC = () => {
   }, [isSettingsOpen]);
 
   // 2. DERIVED STATE (Single Source of Truth)
-  // Instead of syncing local state with useEffect, we calculate it directly from props/store.
-  // This guarantees the UI is always in sync with aiSettings.selectedProvider.
   const currentProviderData = aiManager.getProviders().find(p => p.name === aiSettings.selectedProvider);
   const availableModels: AIModel[] = currentProviderData ? currentProviderData.models : [];
 
